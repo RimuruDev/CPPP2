@@ -2,8 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using Random = System.Random;
 
-namespace Internal 
+namespace Internal
 {
     // NOTE: Онли для теста. Снеси потом бро
     public enum FileFormatType
@@ -24,8 +25,8 @@ namespace Internal
             var validator = new ProgressValidationService();
             var jsonHandler = new JsonFileFormatHandler();
             var binaryHandler = new BinaryFileFormatHandler();
-            FileFormatConfiguration fileFormatConfig ;
-          
+            FileFormatConfiguration fileFormatConfig;
+
             if (fileFormat == FileFormatType.Json)
             {
                 fileFormatConfig = new FileFormatConfiguration(
@@ -68,11 +69,15 @@ namespace Internal
         public void TestSave()
         {
             progressService.UserProgress.SoftCurrency.Value += 100;
-            progressService.AudioSettings.BackgroundMusicVolume.Value += 0.1f;
-            progressService.AudioSettings.SfxVolume.Value += 0.1f;
-            
+            progressService.AudioSettings.BackgroundMusicVolume.Value += GetRandom01();
+            progressService.AudioSettings.SfxVolume.Value += GetRandom01();
+
             progressService.SaveAllProgress();
         }
 
+        private static float GetRandom01() =>
+            UnityEngine.Random.Range(0, 1f) < 0.5f
+                ? -0.1f
+                : 1.0f;
     }
 }
