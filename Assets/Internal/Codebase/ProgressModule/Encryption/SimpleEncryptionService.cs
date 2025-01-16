@@ -54,6 +54,12 @@ namespace Internal
 
         public string Decrypt(string cipherText)
         {
+            if (!IsEncrypted(cipherText))
+            {
+                Debug.LogError("Attempting to decrypt data that is not encrypted.");
+                throw new InvalidDataException("Data is not encrypted or is invalid.");
+            }
+
             try
             {
                 using (Aes aes = Aes.Create())
@@ -83,20 +89,20 @@ namespace Internal
 
             try
             {
-                // Попробуем проверить Base64-декодирование //
-                // Так как я в редакторе часто его юзаю //
+                // Проверяем, является ли строка допустимой Base64 //
                 var decoded = Convert.FromBase64String(data);
 
-                // Минимальная длина данных для шифрования AES (блок 16 байт) //
+                // Минимальная длина данных для шифрования AES //
                 return decoded.Length >= 16;
             }
-            catch
+            catch (FormatException)
             {
-                // Если ошибка, значит, это не зашифрованные данные //
-                // Что мне для Editor мода нормуль. //
+                // Если формат некорректный, данные не зашифрованы //
+                // Онли для редактора, хотя TODO: изучить вопрос. //
                 return false;
             }
         }
+
 
 
         private byte[] PerformCryptography(byte[] data, ICryptoTransform cryptoTransform)
