@@ -18,17 +18,6 @@ namespace Internal
             return true;
         }
 
-        public bool IsValid(AudioSettings progress)
-        {
-            if (progress.BackgroundMusicVolume < 0) //|| progress.BackgroundMusicVolume > 1)
-                return false;
-
-            if (progress.SfxVolume < 0) //|| progress.SfxVolume > 1)
-                return false;
-
-            return true;
-        }
-
         public UserProgress ValidateAndFix(UserProgress progress)
         {
             if (progress == null)
@@ -39,17 +28,40 @@ namespace Internal
 
             if (progress.Level < 1)
             {
-                Debug.LogWarning("Invalid level, resetting to 1.");
                 progress.Level = 1;
+                Debug.LogError("Invalid level, resetting to 1.");
             }
 
             if (progress.HardCurrency < 0)
+            {
                 progress.HardCurrency = 0;
+                Debug.LogError("Invalid hard currency, resetting to 0.");
+            }
 
             if (progress.SoftCurrency < 0)
+            {
                 progress.SoftCurrency = 0;
+                Debug.LogError("Invalid currency level, resetting to 0.");
+            }
 
             return progress;
+        }
+
+        public bool IsValid(AudioSettings progress)
+        {
+            if (progress.BackgroundMusicVolume is < 0 or > 1)
+            {
+                Debug.LogError("Invalid background music volume value: " + progress.BackgroundMusicVolume);
+                return false;
+            }
+
+            if (progress.SfxVolume is < 0 or > 1)
+            {
+                Debug.LogError("Invalid sfx volume value: " + progress.SfxVolume);
+                return false;
+            }
+
+            return true;
         }
 
         public AudioSettings ValidateAndFix(AudioSettings progress)
@@ -60,12 +72,17 @@ namespace Internal
                 return DefaultProgressFactory.CreateDefaultAudioSettings();
             }
 
-            // NOTE: Отрубил для тестов валидацию на > 1
-            if (progress.BackgroundMusicVolume < 0) //|| progress.BackgroundMusicVolume > 1)
+            if (progress.BackgroundMusicVolume is < 0 or > 1)
+            {
                 progress.BackgroundMusicVolume = 1;
+                Debug.LogError("Invalid background music volume. Must be 0 or 1.");
+            }
 
-            if (progress.SfxVolume < 0) //|| progress.SfxVolume > 1)
+            if (progress.SfxVolume is < 0 or > 1)
+            {
                 progress.SfxVolume = 1;
+                Debug.LogError("Invalid sfx volume. Must be 0 or 1.");
+            }
 
             return progress;
         }
