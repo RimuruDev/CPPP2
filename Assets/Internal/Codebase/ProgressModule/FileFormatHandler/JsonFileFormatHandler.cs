@@ -5,7 +5,7 @@ namespace Internal
 {
     public sealed class JsonFileFormatHandler : IFileFormatHandler
     {
-        private const string JSON_FORMAT = "json";
+        private const string JSON_FORMAT = ".json";
 
         public string Serialize<TData>(TData data) =>
             JsonConvert.SerializeObject(data, Formatting.Indented);
