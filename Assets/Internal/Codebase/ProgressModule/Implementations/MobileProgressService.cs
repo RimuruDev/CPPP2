@@ -2,64 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using Internal.Codebase.ProgressModule.Core;
-using Internal.Codebase.ProgressModule.Models;
 using UnityEngine;
 using Newtonsoft.Json;
-using AudioSettings = Internal.Codebase.ProgressModule.Core.AudioSettings;
+using AudioSettings = Internal.AudioSettings;
 
-namespace Internal.Codebase.ProgressModule.Implementations
+namespace Internal
 {
-    public interface IEncryptionService
-    {
-        public string Encrypt(string plainText);
-        public string Decrypt(string cipherText);
-
-        public bool IsEncrypted(string data);
-    }
-
-    public class SimpleEncryptionService : IEncryptionService
-    {
-        // TODO: Замените на безопасный ключ.
-        private const string Key = "my_secret_key";
-
-        public string Encrypt(string plainText)
-        {
-            var bytes = Encoding.UTF8.GetBytes(plainText);
-
-            // TODO: Простая "заглушка" для шифрования 
-            return Convert.ToBase64String(bytes);
-        }
-
-        public string Decrypt(string cipherText)
-        {
-            try
-            {
-                var bytes = Convert.FromBase64String(cipherText);
-                return Encoding.UTF8.GetString(bytes);
-            }
-            catch (FormatException)
-            {
-                Debug.LogError("Decryption failed: invalid Base64 string.");
-                throw new InvalidDataException("Failed to decrypt the data. The data might be corrupted.");
-            }
-        }
-
-        public bool IsEncrypted(string data)
-        {
-            try
-            {
-                var decoded = Convert.FromBase64String(data);
-
-                return decoded.Length > 0;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-    }
-
     public interface IProgressValidator
     {
         bool IsValid(UserProgress progress);

@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using RimuruDev;
 
-namespace Internal.Codebase.ProgressModule.Core
+namespace Internal
 {
     [Serializable]
     public class UserProgress

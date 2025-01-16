@@ -1,7 +1,6 @@
 using System;
-using Internal.Codebase.ProgressModule.Models;
 
-namespace Internal.Codebase.ProgressModule.Core
+namespace Internal
 {
     public interface IProgressService : IDisposable
     {

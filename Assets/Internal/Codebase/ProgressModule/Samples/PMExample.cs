@@ -1,10 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Internal.Codebase.ProgressModule.Implementations;
 using UnityEngine;
 
-namespace Internal.Codebase.ProgressModule.Samples
+namespace Internal 
 {
     // NOTE: Онли для теста. Снеси потом бро
     public enum FileFormatType
