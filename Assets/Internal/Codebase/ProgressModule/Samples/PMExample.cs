@@ -60,9 +60,9 @@ namespace Internal
             );
 
             // TODO: Обновить надо так что бы он сразу все дергал, но пока просто 2 вызова кули
-            progressService.LoadProgress();
-            // progressService.LoadProgressById("user_progress");
-            // progressService.LoadProgressById("audio_settings");
+            //progressService.LoadProgress();
+            progressService.LoadProgressById("user_progress");
+            progressService.LoadProgressById("audio_settings");
             progressService.SaveAllProgress();
         }
 
