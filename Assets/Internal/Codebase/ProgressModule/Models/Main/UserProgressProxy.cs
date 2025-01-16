@@ -35,9 +35,7 @@ namespace Internal
         {
             // === Отписываемся от всех подписок !!!
             foreach (var subscription in subscriptions)
-            {
                 subscription.Dispose();
-            }
 
             subscriptions.Clear();
 
