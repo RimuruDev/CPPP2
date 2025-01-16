@@ -61,9 +61,11 @@ namespace Internal
 
             // TODO: Обновить надо так что бы он сразу все дергал, но пока просто 2 вызова кули
             //progressService.LoadProgress();
-            progressService.LoadProgressById("user_progress");
             progressService.LoadProgressById("audio_settings");
-            progressService.SaveAllProgress();
+            progressService.LoadProgressById("user_progress");
+            // progressService.SaveAllProgress();
+            progressService.SaveProgressById("user_progress");
+            progressService.SaveProgressById("audio_settings");
         }
 
 
@@ -71,13 +73,15 @@ namespace Internal
         public void TestSave()
         {
             progressService.UserProgress.SoftCurrency.Value += 100;
-            progressService.AudioSettings.BackgroundMusicVolume.Value += GetRandom01();
+            progressService.AudioSettings.BackgroundMusicVolume.Value -= 0.22f;
             progressService.AudioSettings.SfxVolume.Value += GetRandom01();
 
-            progressService.SaveAllProgress();
+            //progressService.SaveAllProgress();
+            progressService.SaveProgressById("user_progress");
+            progressService.SaveProgressById("audio_settings");
         }
 
-        [ContextMenu("_"+nameof(ChangeUserProgress))]
+        [ContextMenu("_" + nameof(ChangeUserProgress))]
         private void ChangeUserProgress()
         {
             progressService.UserProgress.SoftCurrency.Value += 300;
