@@ -19,19 +19,6 @@ namespace Internal
 
         private void Awake()
         {
-            // var dataStorage = new FileDataStorage();
-            // var encryptionService = new SimpleEncryptionService();
-            // var validator = new ProgressValidationService();
-            // var fileFormatHandler = new JsonFileFormatHandler();
-            // //var fileFormatHandler = new BinaryFileFormatHandler();
-            //
-            // progressService = new MobileProgressService(dataStorage, encryptionService, validator, fileFormatHandler);
-            //
-            // progressService.LoadProgress();
-            // progressService.UserProgress.SoftCurrency.Value += 100;
-            // progressService.SaveAllProgress();
-
-
             var dataStorage = new FileDataStorage();
             var encryptionService = new SimpleEncryptionService();
             var validator = new ProgressValidationService();
@@ -73,8 +60,6 @@ namespace Internal
 
             // TODO: Обновить надо так что бы он сразу все дергал, но пока просто 2 вызова кули
             progressService.LoadProgress();
-           // progressService.LoadProgressById("audio_settings");
-           // progressService.SaveProgressById("audio_settings");
             progressService.SaveAllProgress();
         }
 
@@ -87,8 +72,7 @@ namespace Internal
             progressService.AudioSettings.SfxVolume.Value += 0.1f;
             
             progressService.SaveAllProgress();
-            // progressService.SaveProgressById("audio_settings");
-            // progressService.SaveProgressById("user_progress");
         }
+
     }
 }
