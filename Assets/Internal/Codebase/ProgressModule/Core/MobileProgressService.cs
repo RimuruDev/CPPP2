@@ -5,25 +5,25 @@ using UnityEngine;
 
 namespace Internal
 {
+    public static class Constants
+    {
+        public const string ROOT_FOLDER_NAME = "Database";
+        public const string USER_PROGRESS_FILE = "user_progress";
+        public const string AUDIO_SETTINGS_FILE = "audio_settings";
+    }
+    
     public class MobileProgressService : IProgressService
     {
-        private const string rootFolderPath = "Database";
-        private const string userProgressFile = "user_progress";
-        private const string audioSettingsFile = "audio_settings";
-
         private readonly string directoryPath;
-        private readonly IFileFormatConfiguration fileFormatConfig;
         private readonly IDataStorage dataStorage;
-        private readonly IEncryptionService encryptionService;
         private readonly IProgressValidator validator;
+        private readonly IEncryptionService encryptionService;
+        private readonly IFileFormatConfiguration fileFormatConfig;
         private readonly IProgressMigrationService migrationService;
 
         private readonly Dictionary<string, Action> idToLoadAction;
         private readonly Dictionary<string, Action> idToSaveAction;
         private readonly Dictionary<string, Action> idToDeleteAction;
-        
-        public IUserProgressProxy UserProgress { get; private set; }
-        public IAudioSettingsProxy AudioSettings { get; private set; }
 
         public MobileProgressService(
             IFileFormatConfiguration fileFormatConfig,
@@ -38,9 +38,13 @@ namespace Internal
             this.validator = validator;
             this.migrationService = migrationService;
 
-            directoryPath = Path.Combine(Application.persistentDataPath, rootFolderPath);
+            directoryPath = Path.Combine(Application.persistentDataPath, Constants.ROOT_FOLDER_NAME);
 
-            Directory.CreateDirectory(directoryPath);
+            if(!Directory.Exists(directoryPath))
+                Directory.CreateDirectory(directoryPath);
+
+            const string userProgressFile = Constants.USER_PROGRESS_FILE;
+            const string audioSettingsFile = Constants.AUDIO_SETTINGS_FILE;
             
             // Маппинг ID на действия //
             idToLoadAction = new Dictionary<string, Action>
@@ -64,29 +68,93 @@ namespace Internal
             };
         }
 
+        #region API
+        
+        public IUserProgressProxy UserProgress { get; private set; }
+        public IAudioSettingsProxy AudioSettings { get; private set; }
+
         public void SaveAllProgress()
         {
-            SaveProgress(userProgressFile, UserProgress.Origin);
-            SaveProgress(audioSettingsFile, AudioSettings.Origin);
+            foreach (var action in idToSaveAction.Values)
+            {
+                action?.Invoke();
+            }
+
+            Debug.Log("All progress saved successfully.");
         }
 
         public void LoadProgress()
         {
-            UserProgress = new UserProgressProxy(LoadProgress(userProgressFile, DefaultProgressFactory.CreateDefaultProgress));
-            AudioSettings = new AudioSettingsProxy(LoadProgress(audioSettingsFile, DefaultProgressFactory.CreateDefaultAudioSettings));
+            foreach (var action in idToLoadAction.Values)
+            {
+                action?.Invoke();
+            }
+
+            Debug.Log("All progress loaded successfully.");
         }
 
         public void DeleteAllProgress()
         {
-            DeleteProgress(userProgressFile);
-            DeleteProgress(audioSettingsFile);
+            foreach (var action in idToDeleteAction.Values)
+            {
+                action?.Invoke();
+            }
+
+            Debug.Log("All progress deleted successfully.");
+        }
+
+        public void SaveProgressById(string id)
+        {
+            if (idToSaveAction.TryGetValue(id, out var action))
+            {
+                action?.Invoke();
+                Debug.Log($"Successfully saved progress for ID: {id}");
+            }
+            else
+            {
+                Debug.LogWarning($"Unknown progress ID: {id}");
+            }
+        }
+
+        public void LoadProgressById(string id)
+        {
+            if (idToLoadAction.TryGetValue(id, out var action))
+            {
+                action?.Invoke();
+                Debug.Log($"Successfully loaded progress for ID: {id}");
+            }
+            else
+            {
+                Debug.LogWarning($"Unknown progress ID: {id}");
+            }
+        }
+
+        public void DeleteProgressById(string id)
+        {
+            if (idToDeleteAction.TryGetValue(id, out var action))
+            {
+                action?.Invoke();
+                Debug.Log($"Successfully deleted progress for ID: {id}");
+            }
+            else
+            {
+                Debug.LogWarning($"Unknown progress ID: {id}");
+            }
         }
 
         public void Dispose()
         {
             UserProgress?.Dispose();
             AudioSettings?.Dispose();
+            
+            idToLoadAction?.Clear();
+            idToSaveAction?.Clear();
+            idToDeleteAction?.Clear();
         }
+
+        #endregion
+
+        #region Abstraction
 
         private void SaveProgress<T>(string fileName, T data)
         {
@@ -131,7 +199,7 @@ namespace Internal
             Debug.Log($"Progress saved to: {savePath}");
         }
 
-        private T LoadProgress<T>(string fileName, Func<T> createDefault) where T : class
+        private TData LoadProgress<TData>(string fileName, Func<TData> createDefault) where TData : class
         {
             var filePath = Path.Combine(directoryPath, fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
 
@@ -140,7 +208,7 @@ namespace Internal
             {
                 Debug.Log($"File for '{fileName}' not found. Attempting migration.");
 
-                Type modelType = typeof(T);
+                Type modelType = typeof(TData);
 
                 var migrated = migrationService.TryMigrate(
                     directoryPath,
@@ -161,13 +229,13 @@ namespace Internal
 
             try
             {
-                var progress = fileFormatConfig.CurrentFormatHandler.Deserialize<T>(decryptedData);
+                var progress = fileFormatConfig.CurrentFormatHandler.Deserialize<TData>(decryptedData);
 
                 // === Валидация данных! | Я точно однажды забуду про это место, черкануть в доку нужно 100%
-                if (typeof(T) == typeof(UserProgress) && !validator.IsValid((UserProgress)(object)progress))
+                if (typeof(TData) == typeof(UserProgress) && !validator.IsValid((UserProgress)(object)progress))
                     throw new InvalidDataException("Invalid UserProgress data.");
 
-                if (typeof(T) == typeof(AudioSettings) && !validator.IsValid((AudioSettings)(object)progress))
+                if (typeof(TData) == typeof(AudioSettings) && !validator.IsValid((AudioSettings)(object)progress))
                     throw new InvalidDataException("Invalid AudioSettings data.");
 
                 return progress;
@@ -203,43 +271,6 @@ namespace Internal
 #endif
         }
 
-        public void SaveProgressById(string id)
-        {
-            if (idToSaveAction.TryGetValue(id, out var action))
-            {
-                action?.Invoke();
-                Debug.Log($"Successfully saved progress for ID: {id}");
-            }
-            else
-            {
-                Debug.LogWarning($"Unknown progress ID: {id}");
-            }
-        }
-
-        public void LoadProgressById(string id)
-        {
-            if (idToLoadAction.TryGetValue(id, out var action))
-            {
-                action?.Invoke();
-                Debug.Log($"Successfully loaded progress for ID: {id}");
-            }
-            else
-            {
-                Debug.LogWarning($"Unknown progress ID: {id}");
-            }
-        }
-
-        public void DeleteProgressById(string id)
-        {
-            if (idToDeleteAction.TryGetValue(id, out var action))
-            {
-                action?.Invoke();
-                Debug.Log($"Successfully deleted progress for ID: {id}");
-            }
-            else
-            {
-                Debug.LogWarning($"Unknown progress ID: {id}");
-            }
-        }
+        #endregion
     }
 }
