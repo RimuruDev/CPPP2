@@ -61,6 +61,8 @@ namespace Internal
 
             // TODO: Обновить надо так что бы он сразу все дергал, но пока просто 2 вызова кули
             progressService.LoadProgress();
+            // progressService.LoadProgressById("user_progress");
+            // progressService.LoadProgressById("audio_settings");
             progressService.SaveAllProgress();
         }
 
@@ -73,6 +75,48 @@ namespace Internal
             progressService.AudioSettings.SfxVolume.Value += GetRandom01();
 
             progressService.SaveAllProgress();
+        }
+
+        [ContextMenu("_"+nameof(ChangeUserProgress))]
+        private void ChangeUserProgress()
+        {
+            progressService.UserProgress.SoftCurrency.Value += 300;
+            progressService.UserProgress.HardCurrency.Value += 150;
+            progressService.UserProgress.UserName.Value = "Mewow" + UnityEngine.Random.Range(1, 50);
+            progressService.UserProgress.Level.Value = UnityEngine.Random.Range(1, 50);
+        }
+
+        [ContextMenu("_" + nameof(ChangeAudioProgress))]
+        private void ChangeAudioProgress()
+        {
+            progressService.AudioSettings.BackgroundMusicVolume.Value -= 0.132f;
+            progressService.AudioSettings.SfxVolume.Value -= 0.123f;
+        }
+
+        [ContextMenu(nameof(SaveUserProgress))]
+        public void SaveUserProgress()
+        {
+            progressService.UserProgress.SoftCurrency.Value += 50;
+            progressService.SaveProgressById("user_progress");
+        }
+
+        [ContextMenu(nameof(SaveAudioSettings))]
+        public void SaveAudioSettings()
+        {
+            progressService.AudioSettings.BackgroundMusicVolume.Value += GetRandom01();
+            progressService.SaveProgressById("audio_settings");
+        }
+
+        [ContextMenu(nameof(LoadUserProgress))]
+        public void LoadUserProgress()
+        {
+            progressService.LoadProgressById("user_progress");
+        }
+
+        [ContextMenu(nameof(LoadAudioSettings))]
+        public void LoadAudioSettings()
+        {
+            progressService.LoadProgressById("audio_settings");
         }
 
         private static float GetRandom01() =>
