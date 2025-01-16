@@ -1,76 +1,24 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using UnityEngine;
-using AudioSettings = Internal.AudioSettings;
 
 namespace Internal
 {
-    public interface IDataStorage
-    {
-        public void Save(string path, string data);
-        public string Load(string path);
-        public void Delete(string path);
-        public bool Exists(string path);
-    }
-
-    public class FileDataStorage : IDataStorage
-    {
-        public void Save(string path, string data)
-        {
-            File.WriteAllText(path, data);
-        }
-
-        public string Load(string path)
-        {
-            return File.ReadAllText(path);
-        }
-
-        public void Delete(string path)
-        {
-            if (Exists(path))
-                File.Delete(path);
-        }
-
-        public bool Exists(string path)
-        {
-            return File.Exists(path);
-        }
-    }
-
-    public interface IFileFormatConfiguration
-    {
-        public IFileFormatHandler CurrentFormatHandler { get; }
-        public List<IFileFormatHandler> SupportedFormatHandlers { get; }
-    }
-
-    public class FileFormatConfiguration : IFileFormatConfiguration
-    {
-        public IFileFormatHandler CurrentFormatHandler { get; }
-        public List<IFileFormatHandler> SupportedFormatHandlers { get; }
-
-        public FileFormatConfiguration(IFileFormatHandler currentHandler, List<IFileFormatHandler> supportedHandlers)
-        {
-            CurrentFormatHandler = currentHandler;
-            SupportedFormatHandlers = supportedHandlers;
-        }
-    }
-
     public class MobileProgressService : IProgressService
     {
-#if UNITY_EDITOR
-        private readonly string fullPathEditor;
-#endif
+        private const string rootFolderPath = "Database";
+        private const string userProgressFile = "user_progress";
+        private const string audioSettingsFile = "audio_settings";
 
         private readonly string directoryPath;
-        private readonly string userProgressFile;
-        private readonly string audioSettingsFile;
         private readonly IFileFormatConfiguration fileFormatConfig;
         private readonly IDataStorage dataStorage;
         private readonly IEncryptionService encryptionService;
         private readonly IProgressValidator validator;
         private readonly IProgressMigrationService migrationService;
+
+        private readonly Dictionary<string, Func<object>> progressMappings;
 
         public IUserProgressProxy UserProgress { get; private set; }
         public IAudioSettingsProxy AudioSettings { get; private set; }
@@ -88,9 +36,27 @@ namespace Internal
             this.validator = validator;
             this.migrationService = migrationService;
 
-            directoryPath = Path.Combine(Application.persistentDataPath, "Database");
-            userProgressFile = "user_progress";
-            audioSettingsFile = "audio_settings";
+            directoryPath = Path.Combine(Application.persistentDataPath, rootFolderPath);
+
+            progressMappings = new Dictionary<string, Func<object>>
+            {
+                {
+                    userProgressFile, () =>
+                    {
+                        if (UserProgress != null)
+                            return UserProgress.Origin;
+
+                        return DefaultProgressFactory.CreateDefaultProgress();
+                    }
+                },
+                {
+                    audioSettingsFile, () =>
+                    {
+                        if (AudioSettings != null) return AudioSettings.Origin;
+                        return DefaultProgressFactory.CreateDefaultAudioSettings();
+                    }
+                }
+            };
 
             Directory.CreateDirectory(directoryPath);
         }
@@ -104,10 +70,10 @@ namespace Internal
         public void LoadProgress()
         {
             UserProgress =
-                new UserProgressProxy(LoadProgress<UserProgress>(userProgressFile,
-                    DefaultProgressFactory.CreateDefaultProgress));
-            AudioSettings = new AudioSettingsProxy(LoadProgress<AudioSettings>(audioSettingsFile,
-                DefaultProgressFactory.CreateDefaultAudioSettings));
+                new UserProgressProxy(LoadProgress(userProgressFile, DefaultProgressFactory.CreateDefaultProgress));
+            AudioSettings =
+                new AudioSettingsProxy(LoadProgress(audioSettingsFile,
+                    DefaultProgressFactory.CreateDefaultAudioSettings));
         }
 
         public void DeleteAllProgress()
@@ -118,8 +84,8 @@ namespace Internal
 
         public void Dispose()
         {
-            // NOTE: Не забыть в конце избавиться от этого метода если в итоге модели не нужно будет освобождать.
-            // Очистка ресурсов, если требуется //
+            UserProgress?.Dispose();
+            AudioSettings?.Dispose();
         }
 
         private void SaveProgress<T>(string fileName, T data)
@@ -154,7 +120,7 @@ namespace Internal
             {
                 // Редакторский файл сохраняется в оригинальном виде
                 // Иначе куча ошибок, да и тяжко это постоянно делать пусть и для редактора.
-                var editorData = rawData; 
+                var editorData = rawData;
                 dataStorage.Save(editorPath, editorData);
                 Debug.Log($"Editor-readable file saved to: {editorPath}");
             }
@@ -217,7 +183,6 @@ namespace Internal
             }
         }
 
-
         private void DeleteProgress(string fileName)
         {
             var filePath = Path.Combine(directoryPath,
@@ -241,28 +206,116 @@ namespace Internal
             }
 #endif
         }
-    }
 
-    public static class DefaultProgressFactory
-    {
-        public static UserProgress CreateDefaultProgress()
+        #region IProgressService implementation
+
+        public void SaveProgressById(string id)
         {
-            return new UserProgress
+            if (!progressMappings.ContainsKey(id))
             {
-                UserName = "Rimuru",
-                Level = 1,
-                HardCurrency = 0,
-                SoftCurrency = 0,
-            };
+                Debug.LogError($"Progress ID '{id}' not found.");
+                return;
+            }
+
+            var savePath = Path.Combine(directoryPath, id + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
+            var rawData = fileFormatConfig.CurrentFormatHandler.Serialize(progressMappings[id]());
+            var encryptedData = encryptionService.Encrypt(rawData);
+
+            dataStorage.Save(savePath, encryptedData);
+
+#if UNITY_EDITOR
+            var editorPath = Path.Combine(directoryPath,
+                id + ".editor" + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
+            var editorData = fileFormatConfig.CurrentFormatHandler.GetFileExtension() == ".rimuru"
+                ? encryptionService.Decrypt(rawData)
+                : rawData;
+            dataStorage.Save(editorPath, editorData);
+#endif
+
+            Debug.Log($"Progress '{id}' saved to: {savePath}");
         }
 
-        public static AudioSettings CreateDefaultAudioSettings()
+        public void LoadProgressById(string id)
         {
-            return new AudioSettings
+            if (!progressMappings.ContainsKey(id))
             {
-                BackgroundMusicVolume = 1,
-                SfxVolume = 1
-            };
+                Debug.LogError($"Progress ID '{id}' not found.");
+                return;
+            }
+
+            var filePath = Path.Combine(directoryPath, id + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
+            if (!dataStorage.Exists(filePath))
+            {
+                Debug.LogWarning($"Progress file for '{id}' not found. Using default data.");
+                return;
+            }
+
+            var rawData = dataStorage.Load(filePath);
+            var decryptedData = encryptionService.IsEncrypted(rawData) ? encryptionService.Decrypt(rawData) : rawData;
+
+            try
+            {
+                var modelType = progressMappings[id]().GetType();
+                var progress = fileFormatConfig.CurrentFormatHandler.Deserialize(decryptedData, modelType);
+
+                if (progress is UserProgress userProgress)
+                {
+                    //
+                    // Потом как нибудь по красивее обернуть нужно эту темку. Так как забуду 100% о том что тут чищу.
+                    //
+                    if (UserProgress is { Origin: not null })
+                        UserProgress?.Dispose();
+
+                    UserProgress = new UserProgressProxy(userProgress);
+                }
+
+                if (progress is AudioSettings audioSettings)
+                {
+                    //
+                    // Потом как нибудь по красивее обернуть нужно эту темку. Так как забуду 100% о том что тут чищу.
+                    //
+                    if (AudioSettings is { Origin: not null })
+                        AudioSettings?.Dispose();
+
+                    AudioSettings = new AudioSettingsProxy(audioSettings);
+                }
+
+                Debug.Log($"Progress '{id}' loaded successfully.");
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"Failed to load progress '{id}': {e.Message}. Using default data.");
+            }
         }
+
+        public void DeleteProgressById(string id)
+        {
+            if (!progressMappings.ContainsKey(id))
+            {
+                Debug.LogError($"Progress ID '{id}' not found.");
+                return;
+            }
+
+            var filePath = Path.Combine(directoryPath, id + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
+            if (dataStorage.Exists(filePath))
+            {
+                dataStorage.Delete(filePath);
+                Debug.Log($"Progress '{id}' deleted.");
+            }
+
+#if UNITY_EDITOR
+            foreach (var handler in fileFormatConfig.SupportedFormatHandlers)
+            {
+                var editorPath = Path.Combine(directoryPath, id + ".editor" + handler.GetFileExtension());
+                if (dataStorage.Exists(editorPath))
+                {
+                    dataStorage.Delete(editorPath);
+                    Debug.Log($"Editor file for '{id}' deleted.");
+                }
+            }
+#endif
+        }
+
+        #endregion
     }
 }
