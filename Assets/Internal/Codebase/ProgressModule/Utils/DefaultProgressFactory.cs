@@ -1,3 +1,6 @@
+using Internal.Codebase.ProgressModule.Models.Gameplay;
+using UnityEngine;
+
 namespace Internal
 {
     public static class DefaultProgressFactory
@@ -19,6 +22,16 @@ namespace Internal
             {
                 BackgroundMusicVolume = 1,
                 SfxVolume = 1
+            };
+        }
+
+        public static WorldProgress CreateDefaultWorldProgress()
+        {
+            return new WorldProgress
+            {
+                CurrentWorldPosition = new Vector3Data(10, 10, 10),
+                CurrentWorldRotation = new Vector3Data(0, 0, 0),
+                CurrentTime = 30
             };
         }
     }

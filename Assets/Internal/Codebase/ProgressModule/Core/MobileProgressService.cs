@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Internal.Codebase.ProgressModule.Models.Gameplay;
 using UnityEngine;
 
 namespace Internal
@@ -10,8 +11,9 @@ namespace Internal
         public const string ROOT_FOLDER_NAME = "Database";
         public const string USER_PROGRESS_FILE = "user_progress";
         public const string AUDIO_SETTINGS_FILE = "audio_settings";
+        public const string WORLD_PROGRESS_FILE = "world_progress";
     }
-    
+
     public class MobileProgressService : IProgressService
     {
         private readonly string directoryPath;
@@ -40,55 +42,68 @@ namespace Internal
 
             directoryPath = Path.Combine(Application.persistentDataPath, Constants.ROOT_FOLDER_NAME);
 
-            if(!Directory.Exists(directoryPath))
+            if (!Directory.Exists(directoryPath))
                 Directory.CreateDirectory(directoryPath);
 
             const string userProgressFile = Constants.USER_PROGRESS_FILE;
             const string audioSettingsFile = Constants.AUDIO_SETTINGS_FILE;
-            
+            const string worldProgressFile = Constants.WORLD_PROGRESS_FILE;
+
             // Маппинг ID на действия //
             idToLoadAction = new Dictionary<string, Action>
             {
-                { userProgressFile, () => UserProgress = new UserProgressProxy(LoadProgress(userProgressFile, DefaultProgressFactory.CreateDefaultProgress)) },
-                { audioSettingsFile, () => AudioSettings = new AudioSettingsProxy(LoadProgress(audioSettingsFile, DefaultProgressFactory.CreateDefaultAudioSettings)) }
+                {
+                    userProgressFile,
+                    () => UserProgress = new UserProgressProxy(LoadAllProgress(userProgressFile,
+                        DefaultProgressFactory.CreateDefaultProgress))
+                },
+                {
+                    audioSettingsFile,
+                    () => AudioSettings = new AudioSettingsProxy(LoadAllProgress(audioSettingsFile,
+                        DefaultProgressFactory.CreateDefaultAudioSettings))
+                },
+                {
+                    worldProgressFile,
+                    () => WorldProgress = new WorldProgressProxy(LoadAllProgress(worldProgressFile,
+                        DefaultProgressFactory.CreateDefaultWorldProgress))
+                }
             };
 
             // Маппинг ID на действия сохранения //
             idToSaveAction = new Dictionary<string, Action>
             {
                 { userProgressFile, () => SaveProgress(userProgressFile, UserProgress.Origin) },
-                { audioSettingsFile, () => SaveProgress(audioSettingsFile, AudioSettings.Origin) }
+                { audioSettingsFile, () => SaveProgress(audioSettingsFile, AudioSettings.Origin) },
+                { worldProgressFile, () => SaveProgress(worldProgressFile, WorldProgress.Origin) }
             };
 
             // Маппинг ID на действия удаления //
             idToDeleteAction = new Dictionary<string, Action>
             {
                 { userProgressFile, () => DeleteProgress(userProgressFile) },
-                { audioSettingsFile, () => DeleteProgress(audioSettingsFile) }
+                { audioSettingsFile, () => DeleteProgress(audioSettingsFile) },
+                { worldProgressFile, () => DeleteProgress(worldProgressFile) }
             };
         }
 
         #region API
-        
+
         public IUserProgressProxy UserProgress { get; private set; }
         public IAudioSettingsProxy AudioSettings { get; private set; }
+        public IWorldProgressProxy WorldProgress { get; private set; }
 
         public void SaveAllProgress()
         {
             foreach (var action in idToSaveAction.Values)
-            {
                 action?.Invoke();
-            }
 
             Debug.Log("All progress saved successfully.");
         }
 
-        public void LoadProgress()
+        public void LoadAllProgress()
         {
             foreach (var action in idToLoadAction.Values)
-            {
                 action?.Invoke();
-            }
 
             Debug.Log("All progress loaded successfully.");
         }
@@ -96,9 +111,7 @@ namespace Internal
         public void DeleteAllProgress()
         {
             foreach (var action in idToDeleteAction.Values)
-            {
                 action?.Invoke();
-            }
 
             Debug.Log("All progress deleted successfully.");
         }
@@ -146,7 +159,8 @@ namespace Internal
         {
             UserProgress?.Dispose();
             AudioSettings?.Dispose();
-            
+            WorldProgress?.Dispose();
+
             idToLoadAction?.Clear();
             idToSaveAction?.Clear();
             idToDeleteAction?.Clear();
@@ -158,7 +172,8 @@ namespace Internal
 
         private void SaveProgress<T>(string fileName, T data)
         {
-            var savePath = Path.Combine(directoryPath, fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
+            var savePath = Path.Combine(directoryPath,
+                fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
             var rawData = fileFormatConfig.CurrentFormatHandler.Serialize(data);
             var encryptedData = encryptionService.Encrypt(rawData);
 
@@ -167,7 +182,8 @@ namespace Internal
             dataStorage.Save(savePath, encryptedData);
 
 #if UNITY_EDITOR
-            var editorPath = Path.Combine(directoryPath, fileName + ".editor" + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
+            var editorPath = Path.Combine(directoryPath,
+                fileName + ".editor" + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
 
             // Удаление устаревших файлов редактора //
             foreach (var handler in fileFormatConfig.SupportedFormatHandlers)
@@ -199,9 +215,10 @@ namespace Internal
             Debug.Log($"Progress saved to: {savePath}");
         }
 
-        private TData LoadProgress<TData>(string fileName, Func<TData> createDefault) where TData : class
+        private TData LoadAllProgress<TData>(string fileName, Func<TData> createDefault) where TData : class
         {
-            var filePath = Path.Combine(directoryPath, fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
+            var filePath = Path.Combine(directoryPath,
+                fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
 
             // === Выполняем миграцию, если необходимо! *Позже так же нужно будет упростить это место. 
             if (!dataStorage.Exists(filePath))
@@ -219,7 +236,8 @@ namespace Internal
 
                 if (!migrated)
                 {
-                    Debug.LogWarning($"No valid save file found for '{fileName}' after migration. Initializing default data.");
+                    Debug.LogWarning(
+                        $"No valid save file found for '{fileName}' after migration. Initializing default data.");
                     return createDefault();
                 }
             }
@@ -238,6 +256,10 @@ namespace Internal
                 if (typeof(TData) == typeof(AudioSettings) && !validator.IsValid((AudioSettings)(object)progress))
                     throw new InvalidDataException("Invalid AudioSettings data.");
 
+                if (typeof(TData) == typeof(WorldProgress) && !validator.IsValid((WorldProgress)(object)progress))
+                    throw new InvalidDataException("Invalid WorldProgress data.");
+
+
                 return progress;
             }
             catch (Exception e)
@@ -250,7 +272,8 @@ namespace Internal
         private void DeleteProgress(string fileName)
         {
             Debug.Log($"<color=red>Deleting file '{fileName}'.</color>");
-            var filePath = Path.Combine(directoryPath, fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
+            var filePath = Path.Combine(directoryPath,
+                fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
 
             if (dataStorage.Exists(filePath))
             {

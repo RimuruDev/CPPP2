@@ -1,14 +1,20 @@
+using Internal.Codebase.ProgressModule.Models.Gameplay;
 using UnityEngine;
 
 namespace Internal
 {
     public class ProgressValidationService : IProgressValidator
     {
+        #region UserProgress
+
         public bool IsValid(UserProgress progress)
         {
             if (progress == null)
                 return false;
 
+            //
+            // NOTE: Тут уже от проекта. Так как срасывать прогресс просто потому что у игрока нет ника, такое себе)
+            //
             if (string.IsNullOrWhiteSpace(progress.UserName))
                 return false;
 
@@ -46,6 +52,10 @@ namespace Internal
 
             return progress;
         }
+
+        #endregion
+
+        #region AudioSettings
 
         public bool IsValid(AudioSettings progress)
         {
@@ -86,5 +96,30 @@ namespace Internal
 
             return progress;
         }
+
+        #endregion
+
+        #region WorldProgress
+
+        public bool IsValid(WorldProgress progress)
+        {
+            if (progress == null)
+                return false;
+
+            return true;
+        }
+
+        public WorldProgress ValidateAndFix(WorldProgress progress)
+        {
+            if (progress == null)
+            {
+                Debug.LogWarning("Progress is null, initializing default progress.");
+                return DefaultProgressFactory.CreateDefaultWorldProgress();
+            }
+
+            return progress;
+        }
+
+        #endregion
     }
 }

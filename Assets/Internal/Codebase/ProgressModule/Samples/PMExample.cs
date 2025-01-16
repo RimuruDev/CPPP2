@@ -33,11 +33,14 @@ namespace Internal
                 migrationService
             );
 
-            progressService.LoadProgressById(Constants.AUDIO_SETTINGS_FILE);
-            progressService.LoadProgressById(Constants.USER_PROGRESS_FILE);
+            // progressService.LoadProgressById(Constants.AUDIO_SETTINGS_FILE);
+            // progressService.LoadProgressById(Constants.USER_PROGRESS_FILE);
+            //
+            // progressService.SaveProgressById(Constants.USER_PROGRESS_FILE);
+            // progressService.SaveProgressById(Constants.AUDIO_SETTINGS_FILE);
             
-            progressService.SaveProgressById(Constants.USER_PROGRESS_FILE);
-            progressService.SaveProgressById(Constants.AUDIO_SETTINGS_FILE);
+            progressService.LoadAllProgress();
+            progressService.SaveAllProgress();
         }
 
 
