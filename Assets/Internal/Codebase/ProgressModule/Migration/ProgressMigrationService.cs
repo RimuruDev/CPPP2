@@ -16,6 +16,7 @@ namespace Internal
             this.encryptionService = encryptionService;
         }
 
+        // NOTE: Разбить на мелкие методы.
         public bool TryMigrate(
             string directoryPath,
             string baseFileName,
@@ -32,23 +33,25 @@ namespace Internal
 
                 try
                 {
-                    // === Загрузка данных из устаревшего формата.
                     var rawData = dataStorage.Load(legacyPath);
                     var decryptedData = encryptionService.IsEncrypted(rawData)
                         ? encryptionService.Decrypt(rawData)
                         : rawData;
 
-                    // === Десериализация их.
                     var progress = formatHandler.Deserialize(decryptedData, modelType);
 
-                    // === Сериализация в целевой формат.
                     var newFilePath = Path.Combine(directoryPath, baseFileName + targetFormat.GetFileExtension());
                     var newData = targetFormat.Serialize(progress);
                     var encryptedNewData = encryptionService.Encrypt(newData);
 
                     dataStorage.Save(newFilePath, encryptedNewData);
 
-                    // === Удаление старого файла. !Editor тоже кстати не забыть бы отправить в вальхалу.
+#if UNITY_EDITOR
+                    var editorFilePath = Path.Combine(directoryPath, baseFileName + ".editor" + targetFormat.GetFileExtension());
+                    dataStorage.Save(editorFilePath, newData);
+                    Debug.Log($"Editor-readable file saved during migration: {editorFilePath}");
+#endif
+
                     dataStorage.Delete(legacyPath);
 
                     Debug.Log($"Migration successful from {legacyPath} to {newFilePath}");
