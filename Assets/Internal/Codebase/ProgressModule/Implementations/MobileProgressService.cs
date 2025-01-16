@@ -3,89 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEngine;
-using Newtonsoft.Json;
 using AudioSettings = Internal.AudioSettings;
 
 namespace Internal
 {
-    public interface IProgressValidator
-    {
-        bool IsValid(UserProgress progress);
-        bool IsValid(AudioSettings progress);
-
-        public UserProgress ValidateAndFix(UserProgress progress);
-        public AudioSettings ValidateAndFix(AudioSettings progress);
-    }
-
-    public class ProgressValidationService : IProgressValidator
-    {
-        public bool IsValid(UserProgress progress)
-        {
-            if (progress == null)
-                return false;
-
-            if (string.IsNullOrWhiteSpace(progress.UserName))
-                return false;
-
-            if (progress.Level <= 0)
-                return false;
-
-            return true;
-        }
-
-        public bool IsValid(AudioSettings progress)
-        {
-            if (progress.BackgroundMusicVolume < 0) //|| progress.BackgroundMusicVolume > 1)
-                return false;
-
-            if (progress.SfxVolume < 0) //|| progress.SfxVolume > 1)
-                return false;
-
-            return true;
-        }
-
-        public UserProgress ValidateAndFix(UserProgress progress)
-        {
-            if (progress == null)
-            {
-                Debug.LogWarning("Progress is null, initializing default progress.");
-                return DefaultProgressFactory.CreateDefaultProgress();
-            }
-
-            if (progress.Level < 1)
-            {
-                Debug.LogWarning("Invalid level, resetting to 1.");
-                progress.Level = 1;
-            }
-
-            if (progress.HardCurrency < 0)
-                progress.HardCurrency = 0;
-
-            if (progress.SoftCurrency < 0)
-                progress.SoftCurrency = 0;
-
-            return progress;
-        }
-
-        public AudioSettings ValidateAndFix(AudioSettings progress)
-        {
-            if (progress == null)
-            {
-                Debug.LogWarning("Progress is null, initializing default progress.");
-                return DefaultProgressFactory.CreateDefaultAudioSettings();
-            }
-
-            // NOTE: Отрубил для тестов валидацию на > 1
-            if (progress.BackgroundMusicVolume < 0) //|| progress.BackgroundMusicVolume > 1)
-                progress.BackgroundMusicVolume = 1;
-
-            if (progress.SfxVolume < 0) //|| progress.SfxVolume > 1)
-                progress.SfxVolume = 1;
-
-            return progress;
-        }
-    }
-
     public interface IDataStorage
     {
         public void Save(string path, string data);
@@ -117,53 +38,6 @@ namespace Internal
             return File.Exists(path);
         }
     }
-    
-    public interface IFileFormatHandler
-    {
-        public string Serialize<T>(T data);
-        public T Deserialize<T>(string serializedData);
-        public object Deserialize(string serializedData, Type type);
-        public string GetFileExtension();
-    }
-
-    public class JsonFileFormatHandler : IFileFormatHandler
-    {
-        public string Serialize<T>(T data) => JsonConvert.SerializeObject(data, Formatting.Indented);
-
-        public T Deserialize<T>(string serializedData) => JsonConvert.DeserializeObject<T>(serializedData);
-
-        public object Deserialize(string serializedData, Type type) =>
-            JsonConvert.DeserializeObject(serializedData, type);
-
-
-        public string GetFileExtension() => ".json";
-    }
-
-    public class BinaryFileFormatHandler : IFileFormatHandler
-    {
-        public string Serialize<T>(T data)
-        {
-            var json = JsonConvert.SerializeObject(data);
-            var bytes = Encoding.UTF8.GetBytes(json);
-            return Convert.ToBase64String(bytes); //TODO: Заглушка
-        }
-
-        public T Deserialize<T>(string serializedData)
-        {
-            var bytes = Convert.FromBase64String(serializedData); //TODO: Заглушка
-            var json = Encoding.UTF8.GetString(bytes);
-            return JsonConvert.DeserializeObject<T>(json);
-        }
-
-        public object Deserialize(string serializedData, Type type)
-        {
-            var bytes = Convert.FromBase64String(serializedData); // TODO: Заглушка...
-            var json = Encoding.UTF8.GetString(bytes);
-            return JsonConvert.DeserializeObject(json, type);
-        }
-
-        public string GetFileExtension() => ".rimuru";
-    }
 
     public interface IProgressMigrationService
     {
@@ -174,7 +48,7 @@ namespace Internal
             IEnumerable<IFileFormatHandler> supportedFormats,
             Type modelType);
     }
-    
+
     public class ProgressMigrationService : IProgressMigrationService
     {
         private readonly IDataStorage dataStorage;
@@ -233,7 +107,7 @@ namespace Internal
             return false;
         }
     }
-    
+
     public interface IFileFormatConfiguration
     {
         public IFileFormatHandler CurrentFormatHandler { get; }
@@ -251,7 +125,7 @@ namespace Internal
             SupportedFormatHandlers = supportedHandlers;
         }
     }
-    
+
     public class MobileProgressService : IProgressService
     {
 #if UNITY_EDITOR
