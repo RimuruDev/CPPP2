@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
-using Internal.Codebase.ProgressModule.Core;
 using RimuruDev;
 
-namespace Internal.Codebase.ProgressModule.Models
+namespace Internal
 {
     public interface IUserProgressProxy : IDisposable
     {
