@@ -129,12 +129,15 @@ namespace Internal
             var rawData = fileFormatConfig.CurrentFormatHandler.Serialize(data);
             var encryptedData = encryptionService.Encrypt(rawData);
 
+            // Сохранение основного файла //
+            // NOTE: Покрыть тестами на время выполнения.
             dataStorage.Save(savePath, encryptedData);
 
 #if UNITY_EDITOR
             var editorPath = Path.Combine(directoryPath,
                 fileName + ".editor" + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
 
+            // Удаление устаревших файлов редактора //
             foreach (var handler in fileFormatConfig.SupportedFormatHandlers)
             {
                 var legacyEditorPath = Path.Combine(directoryPath, fileName + ".editor" + handler.GetFileExtension());
@@ -145,11 +148,20 @@ namespace Internal
                 }
             }
 
-            var editorData = fileFormatConfig.CurrentFormatHandler.GetFileExtension() == ".rimuru"
-                ? encryptionService.Decrypt(rawData)
-                : rawData;
-            dataStorage.Save(editorPath, editorData);
-            Debug.Log($"Editor-readable file saved to: {editorPath}");
+            // NOTE: Сохранение редакторского файла //
+            // Это блин важно! Потом вынеси для API с ключами для сейва.
+            try
+            {
+                // Редакторский файл сохраняется в оригинальном виде
+                // Иначе куча ошибок, да и тяжко это постоянно делать пусть и для редактора.
+                var editorData = rawData; 
+                dataStorage.Save(editorPath, editorData);
+                Debug.Log($"Editor-readable file saved to: {editorPath}");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"Failed to save editor file: {ex.Message}");
+            }
 #endif
 
             Debug.Log($"Progress saved to: {savePath}");
