@@ -18,6 +18,10 @@ namespace Internal
         private readonly IProgressValidator validator;
         private readonly IProgressMigrationService migrationService;
 
+        private readonly Dictionary<string, Action> idToLoadAction;
+        private readonly Dictionary<string, Action> idToSaveAction;
+        private readonly Dictionary<string, Action> idToDeleteAction;
+        
         public IUserProgressProxy UserProgress { get; private set; }
         public IAudioSettingsProxy AudioSettings { get; private set; }
 
@@ -37,6 +41,27 @@ namespace Internal
             directoryPath = Path.Combine(Application.persistentDataPath, rootFolderPath);
 
             Directory.CreateDirectory(directoryPath);
+            
+            // Маппинг ID на действия //
+            idToLoadAction = new Dictionary<string, Action>
+            {
+                { userProgressFile, () => UserProgress = new UserProgressProxy(LoadProgress(userProgressFile, DefaultProgressFactory.CreateDefaultProgress)) },
+                { audioSettingsFile, () => AudioSettings = new AudioSettingsProxy(LoadProgress(audioSettingsFile, DefaultProgressFactory.CreateDefaultAudioSettings)) }
+            };
+
+            // Маппинг ID на действия сохранения //
+            idToSaveAction = new Dictionary<string, Action>
+            {
+                { userProgressFile, () => SaveProgress(userProgressFile, UserProgress.Origin) },
+                { audioSettingsFile, () => SaveProgress(audioSettingsFile, AudioSettings.Origin) }
+            };
+
+            // Маппинг ID на действия удаления //
+            idToDeleteAction = new Dictionary<string, Action>
+            {
+                { userProgressFile, () => DeleteProgress(userProgressFile) },
+                { audioSettingsFile, () => DeleteProgress(audioSettingsFile) }
+            };
         }
 
         public void SaveAllProgress()
@@ -156,6 +181,7 @@ namespace Internal
 
         private void DeleteProgress(string fileName)
         {
+            Debug.Log($"<color=red>Deleting file '{fileName}'.</color>");
             var filePath = Path.Combine(directoryPath, fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
 
             if (dataStorage.Exists(filePath))
@@ -179,44 +205,41 @@ namespace Internal
 
         public void SaveProgressById(string id)
         {
+            if (idToSaveAction.TryGetValue(id, out var action))
+            {
+                action?.Invoke();
+                Debug.Log($"Successfully saved progress for ID: {id}");
+            }
+            else
+            {
+                Debug.LogWarning($"Unknown progress ID: {id}");
+            }
         }
 
         public void LoadProgressById(string id)
         {
-            switch (id)
+            if (idToLoadAction.TryGetValue(id, out var action))
             {
-                case userProgressFile:
-                    
-                    if(UserProgress is { Origin: not null })
-                    {
-                        UserProgress.Dispose();
-                        Debug.Log($"Disposing {nameof(UserProgress)}");
-                    }
-                    
-                    UserProgress = new UserProgressProxy(LoadProgress(userProgressFile, DefaultProgressFactory.CreateDefaultProgress));
-                    Debug.Log($"Loaded UserProgress with ID: {id}");
-                    break;
-
-                case audioSettingsFile:
-                    
-                    if(AudioSettings is { Origin: not null })
-                    {
-                        AudioSettings.Dispose();
-                        Debug.Log($"Disposing {nameof(AudioSettings)}");
-                    }
-                    
-                    AudioSettings = new AudioSettingsProxy(LoadProgress(audioSettingsFile, DefaultProgressFactory.CreateDefaultAudioSettings));
-                    Debug.Log($"Loaded AudioSettings with ID: {id}");
-                    break;
-
-                default:
-                    Debug.LogWarning($"Unknown progress ID: {id}");
-                    break;
+                action?.Invoke();
+                Debug.Log($"Successfully loaded progress for ID: {id}");
+            }
+            else
+            {
+                Debug.LogWarning($"Unknown progress ID: {id}");
             }
         }
 
         public void DeleteProgressById(string id)
         {
+            if (idToDeleteAction.TryGetValue(id, out var action))
+            {
+                action?.Invoke();
+                Debug.Log($"Successfully deleted progress for ID: {id}");
+            }
+            else
+            {
+                Debug.LogWarning($"Unknown progress ID: {id}");
+            }
         }
     }
 }
