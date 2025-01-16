@@ -1,21 +1,18 @@
 using System;
+using Internal;
+using Internal.Codebase.ProgressModule.Models.Gameplay;
 
-namespace Internal
+public interface IProgressService : IDisposable
 {
-    public interface IProgressService : IDisposable
-    {
-        // Models ====
-        public IUserProgressProxy UserProgress { get; }
-        public IAudioSettingsProxy AudioSettings { get;  }
+    public IUserProgressProxy UserProgress { get; }
+    public IAudioSettingsProxy AudioSettings { get; }
+    public IWorldProgressProxy WorldProgress { get; }
 
-        // Classics API ===
-        public void SaveAllProgress();
-        public void LoadProgress();
-        public void DeleteAllProgress();
+    public void SaveAllProgress();
+    public void LoadAllProgress();
+    public void DeleteAllProgress();
 
-        // No WEBGL API ===
-        // public void SaveProgressById(string id);
-        // public void LoadProgressById(string id);
-        // public void DeleteProgressById(string id);
-    }
+    public void SaveProgressById(string id);
+    public void LoadProgressById(string id);
+    public void DeleteProgressById(string id);
 }

@@ -52,9 +52,22 @@ namespace RimuruDev
             Value = nextValue;
         }
 
-        // TODO: Не забудь добавить на github!!!
         /// <summary>
         /// Подписка на изменения с поддержкой IDisposable.
+        /// <example>
+        /// <code>
+        /// Пример:
+        /// 1:
+        /// private readonly List-IDisposable> subscriptions = new();
+        ///
+        /// 2:
+        /// subscriptions.Add(UserName.Subscribe(value => Origin.UserName = value));
+        ///
+        /// 3:
+        ///  foreach (var subscription in subscriptions)
+        ///     subscription.Dispose();
+        /// </code>
+        /// </example>
         /// </summary>
         /// <param name="callback">Метод обратного вызова.</param>
         /// <returns>Объект IDisposable для отписки.</returns>

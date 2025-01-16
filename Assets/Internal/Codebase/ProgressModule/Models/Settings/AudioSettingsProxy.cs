@@ -1,34 +1,12 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using RimuruDev;
 
 namespace Internal
 {
-    [Serializable]
-    public class UserProgress
-    {
-        public string UserName;
-        public int Level;
-        public int SoftCurrency;
-        public int HardCurrency;
-    }
-
-    [Serializable]
-    public class AudioSettings
-    {
-        public float BackgroundMusicVolume;
-        public float SfxVolume;
-    }
-
-    public interface IAudioSettingsProxy
-    {
-        public AudioSettings Origin { get; }
-        public ReactiveProperty<float> BackgroundMusicVolume { get; }
-        public ReactiveProperty<float> SfxVolume { get; }
-        public void Dispose();
-    }
-
+    //
+    // Исключительно для теста
+    //
     public class AudioSettingsProxy : IAudioSettingsProxy
     {
         public AudioSettings Origin { get; private set; }
