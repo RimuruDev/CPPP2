@@ -14,7 +14,9 @@
 10. В методе LoadProgress имплементации IProgressService, указать IWorldProgressProxy
 11. В IProgressValidator добавить IsValid и ValidateAndFix для WorldProgress
 12. Реализовать методы  IsValid и ValidateAndFix у имплементации IProgressValidator
-13. Готово! Остается только 1 раз сделать попытку на Load/LoadById
+13. Добавить инициализацию новых данных в LoadAllProgress
+14. Готово! Остается только 1 раз сделать попытку на Load/LoadById
+
 
 
 1.
@@ -303,7 +305,29 @@ public interface IProgressService : IDisposable
         }
    }
 ```
+13.
+```csharp
+ public void SaveAllProgress()
+        {
+            if (IsFirstLaunch())
+            {
+                Debug.Log("First launch detected. Initializing default progress.");
 
+                UserProgress = new UserProgressProxy(DefaultProgressFactory.CreateDefaultProgress());
+                AudioSettings = new AudioSettingsProxy(DefaultProgressFactory.CreateDefaultAudioSettings());
+                
+                // Вот так!
+                WorldProgress = new WorldProgressProxy(DefaultProgressFactory.CreateDefaultWorldProgress());
+
+                return;
+            }
+            
+            foreach (var action in idToSaveAction.Values)
+                action?.Invoke();
+
+            Debug.Log("All progress saved successfully.");
+        }
+```
 
 Все! Теперь только дергуть метод   progressService.LoadAllProgress(); и файлик будет создан.
 
