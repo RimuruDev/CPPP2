@@ -402,6 +402,7 @@ namespace Internal
             }
 
             var ids = idToLoadAction.Keys.ToList();
+            var totalSteps = ids.Count;
 
             for (var i = 0; i < ids.Count; i++)
             {
@@ -410,7 +411,19 @@ namespace Internal
                 if (idToLoadAction.TryGetValue(id, out var action))
                 {
                     action?.Invoke();
-                    operation.UpdateProgress((float)(i + 1) / ids.Count, $"Loaded {id}");
+                    
+                    var targetProgress = (float)(i + 1) / totalSteps;
+
+                    while (operation.Progress < targetProgress)
+                    {
+                        operation.UpdateProgress(Mathf.MoveTowards(
+                                operation.Progress,
+                                targetProgress,
+                                Time.deltaTime * 0.5f),
+                            $"Loading {id}");
+
+                        yield return null;
+                    }
 
                     yield return null;
                 }
