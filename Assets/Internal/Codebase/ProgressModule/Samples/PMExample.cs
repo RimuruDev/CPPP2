@@ -10,13 +10,22 @@ namespace Internal
     public class PMExample : MonoBehaviour
     {
         // Debug only
-        public UserProgress UserProgress;
-        public AudioSettings AudioSettings;
-        public WorldProgress WorldProgress;
+        // [SerializeField] private UserProgress userProgress;
+        // [SerializeField] private AudioSettings audioSettings;
+        // [SerializeField] private WorldProgress worldProgress;
         [SerializeField] private FileFormatType fileFormat;
 
+        // == load
         [SerializeField] private Slider progressBar;
         [SerializeField] private TMP_Text progressText;
+
+        // == save
+        [SerializeField] private Slider saveProgressBar;
+        [SerializeField] private TMP_Text saveProgressText;
+
+        // == btns
+        [SerializeField] private Button saveButton;
+        [SerializeField] private Button loadButton;
 
         private MobileProgressService progressService;
 
@@ -60,6 +69,9 @@ namespace Internal
             // UserProgress = progressService.UserProgress.Origin;
             // AudioSettings= progressService.AudioSettings.Origin;
             // WorldProgress= progressService.WorldProgress.Origin;
+
+            saveButton.onClick.AddListener(TestSaveWithUI);
+            loadButton.onClick.AddListener(TestLoadWithUI);
         }
 
         // private IEnumerator Start()
@@ -74,17 +86,25 @@ namespace Internal
         //     Debug.Log($"Loading complete: {loadOperation.Status}");
         //     Debug.Log($"Progress: {loadOperation.Progress}");
         // }
-
-        private IEnumerator Start()
+       
+        [ContextMenu("____" + nameof(TestLoadWithUI))]
+        private void TestLoadWithUI()
         {
             var loadOperation = new ProgressOperation();
-
             StartCoroutine(UpdateProgressUI(loadOperation));
+            StartCoroutine(progressService.LoadAllProgressCoroutine(loadOperation));
 
-            yield return StartCoroutine(progressService.LoadAllProgressCoroutine(loadOperation));
+            // Debug.Log($"Loading complete: {loadOperation.Status}");
+            // Debug.Log($"Progress: {loadOperation.Progress}");
+        }
+        
+        [ContextMenu("____" + nameof(TestSaveWithUI))]
+        public void TestSaveWithUI()
+        {
+            var saveOperation = new ProgressOperation();
 
-            Debug.Log($"Loading complete: {loadOperation.Status}");
-            Debug.Log($"Progress: {loadOperation.Progress}");
+            StartCoroutine(UpdateSaveProgressUI(saveOperation));
+            StartCoroutine(progressService.SaveAllProgressCoroutine(saveOperation));
         }
 
         private IEnumerator UpdateProgressUI(ProgressOperation operation)
@@ -98,6 +118,19 @@ namespace Internal
 
             progressBar.value = 1f;
             progressText.text = $"Status: {operation.Status}\nProgress: 100%";
+        }
+
+        private IEnumerator UpdateSaveProgressUI(ProgressOperation operation)
+        {
+            while (!operation.IsDone)
+            {
+                saveProgressBar.value = operation.Progress;
+                saveProgressText.text = $"Status: {operation.Status}\nProgress: {operation.Progress * 100:F1}%";
+                yield return null;
+            }
+
+            saveProgressBar.value = 1f;
+            saveProgressText.text = $"Status: {operation.Status}\nProgress: 100%";
         }
 
         [ContextMenu(nameof(TestSave))]
