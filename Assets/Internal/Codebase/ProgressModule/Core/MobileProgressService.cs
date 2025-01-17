@@ -1,11 +1,33 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Internal.Codebase.ProgressModule.Models.Gameplay;
 using UnityEngine;
 
 namespace Internal
 {
+    public class ProgressOperation
+    {
+        public bool IsDone { get; private set; }
+        public float Progress { get; private set; }
+        public string Status { get; private set; }
+
+        public void Complete(string status = "Done")
+        {
+            IsDone = true;
+            Progress = 1f;
+            Status = status;
+        }
+
+        public void UpdateProgress(float progress, string status = "")
+        {
+            Progress = progress;
+            Status = status;
+        }
+    }
+    
     public static class Constants
     {
         public const string ROOT_FOLDER_NAME = "Database";
@@ -53,19 +75,43 @@ namespace Internal
             idToLoadAction = new Dictionary<string, Action>
             {
                 {
-                    userProgressFile,
-                    () => UserProgress = new UserProgressProxy(LoadAllProgress(userProgressFile,
-                        DefaultProgressFactory.CreateDefaultProgress))
+                    userProgressFile, () =>
+                    {
+                        if(UserProgress is { Origin: not null })
+                        {
+                            Debug.Log($"<color=yellow>User Progress Disposed.</color>: {UserProgress}>");
+                            UserProgress?.Dispose();
+                        }
+                        
+                        UserProgress = new UserProgressProxy(LoadAllProgress(userProgressFile,
+                            DefaultProgressFactory.CreateDefaultProgress));
+                    }
                 },
                 {
-                    audioSettingsFile,
-                    () => AudioSettings = new AudioSettingsProxy(LoadAllProgress(audioSettingsFile,
-                        DefaultProgressFactory.CreateDefaultAudioSettings))
+                    audioSettingsFile, () =>
+                    {
+                        if(AudioSettings is { Origin: not null })
+                        {
+                            Debug.Log($"<color=yellow>Audio Settings Disposed.</color>: {AudioSettings}>");
+                            AudioSettings?.Dispose();
+                        }
+                        
+                        AudioSettings = new AudioSettingsProxy(LoadAllProgress(audioSettingsFile,
+                            DefaultProgressFactory.CreateDefaultAudioSettings));
+                    }
                 },
                 {
-                    worldProgressFile,
-                    () => WorldProgress = new WorldProgressProxy(LoadAllProgress(worldProgressFile,
-                        DefaultProgressFactory.CreateDefaultWorldProgress))
+                    worldProgressFile, () =>
+                    {
+                        if(WorldProgress is { Origin: not null })
+                        {
+                            Debug.Log($"<color=yellow>World Progress Disposed.</color>: {WorldProgress}>");
+                            WorldProgress?.Dispose();
+                        }
+                        
+                        WorldProgress = new WorldProgressProxy(LoadAllProgress(worldProgressFile,
+                            DefaultProgressFactory.CreateDefaultWorldProgress));
+                    }
                 }
             };
 
@@ -115,7 +161,7 @@ namespace Internal
 
                 return;
             }
-            
+
             foreach (var action in idToLoadAction.Values)
             {
                 Debug.Log($"[Load Progress] {action}");
@@ -192,7 +238,8 @@ namespace Internal
 
         private void SaveProgress<T>(string fileName, T data)
         {
-            var savePath = Path.Combine(directoryPath, fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
+            var savePath = Path.Combine(directoryPath,
+                fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
             var rawData = fileFormatConfig.CurrentFormatHandler.Serialize(data);
             var encryptedData = encryptionService.Encrypt(rawData);
 
@@ -257,15 +304,15 @@ namespace Internal
                 {
                     Debug.LogWarning($"No valid save file found for '{fileName}' after migration. " +
                                      $"Initializing default data.");
-                    
+
                     return createDefault();
                 }
             }
 
             var rawData = dataStorage.Load(filePath);
-            
-            var decryptedData = encryptionService.IsEncrypted(rawData) 
-                ? encryptionService.Decrypt(rawData) 
+
+            var decryptedData = encryptionService.IsEncrypted(rawData)
+                ? encryptionService.Decrypt(rawData)
                 : rawData;
 
             // Validation Layer ===
@@ -296,7 +343,7 @@ namespace Internal
         private void DeleteProgress(string fileName)
         {
             Debug.Log($"<color=red>Deleting file '{fileName}'.</color>");
-            
+
             var fileFormat = fileFormatConfig.CurrentFormatHandler.GetFileExtension();
             var filePath = Path.Combine(directoryPath, fileName + fileFormat);
 
@@ -352,8 +399,224 @@ namespace Internal
             var existFiles = files.Length == 0;
 
             Debug.Log($"<color=yellow>[FirstLaunch] Found {files.Length} file(s) in directory.</color>");
-            
+
             return existFiles;
+        }
+
+        #endregion
+
+        #region Coroutines
+
+        public IEnumerator LoadAllProgressCoroutine(ProgressOperation operation)
+        {
+            operation.UpdateProgress(0f, status: "Initializing...");
+
+            if (IsFirstLaunch())
+            {
+                Debug.Log("[First launch detected. Initializing default progress.]");
+
+                UserProgress = new UserProgressProxy(DefaultProgressFactory.CreateDefaultProgress());
+                AudioSettings = new AudioSettingsProxy(DefaultProgressFactory.CreateDefaultAudioSettings());
+                WorldProgress = new WorldProgressProxy(DefaultProgressFactory.CreateDefaultWorldProgress());
+
+                operation.Complete("[Default data initialized.]");
+
+                yield break;
+            }
+
+            var ids = idToLoadAction.Keys.ToList();
+            var totalSteps = ids.Count;
+
+            for (var i = 0; i < ids.Count; i++)
+            {
+                var id = ids[i];
+
+                if (idToLoadAction.TryGetValue(id, out var action))
+                {
+                    action?.Invoke();
+
+                    var targetProgress = (float)(i + 1) / totalSteps;
+
+                    while (operation.Progress < targetProgress)
+                    {
+                        operation.UpdateProgress(Mathf.MoveTowards(
+                                operation.Progress,
+                                targetProgress,
+                                Time.deltaTime * 0.5f),
+                            $"Loading {id}");
+
+                        yield return null;
+                    }
+
+                    yield return null;
+                }
+            }
+
+            operation.Complete("All progress loaded successfully.");
+        }
+
+        public IEnumerator SaveAllProgressCoroutine(ProgressOperation operation)
+        {
+            operation.UpdateProgress(0f, "Initializing...");
+
+            var ids = idToSaveAction.Keys.ToList();
+            var totalSteps = ids.Count;
+
+            for (var i = 0; i < ids.Count; i++)
+            {
+                var id = ids[i];
+
+                if (idToSaveAction.TryGetValue(id, out var action))
+                {
+                    action?.Invoke();
+
+                    var targetProgress = (float)(i + 1) / totalSteps;
+
+                    while (operation.Progress < targetProgress)
+                    {
+                        operation.UpdateProgress(Mathf.MoveTowards(
+                                operation.Progress,
+                                targetProgress,
+                                Time.deltaTime * 0.5f),
+                            $"Saving {id}");
+
+                        yield return null;
+                    }
+
+                    yield return null;
+                }
+            }
+
+            operation.Complete("All progress saved successfully.");
+        }
+        
+        public IEnumerator DeleteAllProgressCoroutine(ProgressOperation operation)
+        {
+            operation.UpdateProgress(0f, "Initializing...");
+
+            var ids = idToDeleteAction.Keys.ToList();
+            var totalSteps = ids.Count;
+
+            for (var i = 0; i < ids.Count; i++)
+            {
+                var id = ids[i];
+
+                if (idToDeleteAction.TryGetValue(id, out var action))
+                {
+                    action?.Invoke();
+
+                    var targetProgress = (float)(i + 1) / totalSteps;
+
+                    while (operation.Progress < targetProgress)
+                    {
+                        operation.UpdateProgress(Mathf.MoveTowards(
+                                operation.Progress,
+                                targetProgress,
+                                Time.deltaTime * 0.5f),
+                            $"Deleting {id}");
+
+                        yield return null;
+                    }
+
+                    yield return null;
+                }
+            }
+
+            operation.Complete("All progress deleted successfully.");
+        }
+
+        public IEnumerator SaveProgressByIdCoroutine(string id, ProgressOperation operation)
+        {
+            operation.UpdateProgress(0f, $"Initializing save for ID: {id}");
+
+            if (idToSaveAction.TryGetValue(id, out var action))
+            {
+                action?.Invoke();
+
+                // NOTE: Для одного ID прогресс всегда равен 100%
+                // Пока не буду в константы выносить, пусть будет так пока что для простоты.
+                var targetProgress = 1f;
+
+                while (operation.Progress < targetProgress)
+                {
+                    operation.UpdateProgress(Mathf.MoveTowards(
+                            operation.Progress,
+                            targetProgress,
+                            Time.deltaTime * 0.5f),
+                        $"Saving {id}");
+
+                    yield return null;
+                }
+
+                operation.Complete($"Save for ID {id} completed successfully.");
+            }
+            else
+            {
+                operation.Complete($"Unknown ID: {id}. Save skipped.");
+                Debug.LogWarning($"Unknown progress ID: {id}");
+            }
+        }
+
+        public IEnumerator LoadProgressByIdCoroutine(string id, ProgressOperation operation)
+        {
+            operation.UpdateProgress(0f, $"Initializing load for ID: {id}");
+
+            if (idToLoadAction.TryGetValue(id, out var action))
+            {
+                action?.Invoke();
+
+                // NOTE: Для одного ID прогресс всегда равен 100%
+                // Так же я продублировал в сейве и удалении файла, при рефакторе надо бы учесть это.
+                var targetProgress = 1f; 
+
+                while (operation.Progress < targetProgress)
+                {
+                    operation.UpdateProgress(Mathf.MoveTowards(
+                            operation.Progress,
+                            targetProgress,
+                            Time.deltaTime * 0.5f),
+                        $"Loading {id}");
+
+                    yield return null;
+                }
+
+                operation.Complete($"Load for ID {id} completed successfully.");
+            }
+            else
+            {
+                operation.Complete($"Unknown ID: {id}. Load skipped.");
+                Debug.LogWarning($"Unknown progress ID: {id}");
+            }
+        }
+
+        public IEnumerator DeleteProgressByIdCoroutine(string id, ProgressOperation operation)
+        {
+            operation.UpdateProgress(0f, $"Initializing delete for ID: {id}");
+
+            if (idToDeleteAction.TryGetValue(id, out var action))
+            {
+                action?.Invoke();
+
+                var targetProgress = 1f;
+
+                while (operation.Progress < targetProgress)
+                {
+                    operation.UpdateProgress(Mathf.MoveTowards(
+                            operation.Progress,
+                            targetProgress,
+                            Time.deltaTime * 0.5f),
+                        $"Deleting {id}"); // TODO: Передавать enum что бы можно было локализировать.
+
+                    yield return null;
+                }
+
+                operation.Complete($"Delete for ID {id} completed successfully.");
+            }
+            else
+            {
+                operation.Complete($"Unknown ID: {id}. Delete skipped.");
+                Debug.LogWarning($"Unknown progress ID: {id}");
+            }
         }
 
         #endregion
