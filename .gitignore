@@ -73,3 +73,7 @@ crashlytics-build.properties
 /.idea/.idea.CPPP2
 /Assets/TextMesh Pro/Documentation
 Assets/TextMesh Pro/Documentation.meta
+/Assets/Internal/UnitySkipSplashScreen-main
+/Assets/LunarConsole
+Assets/Internal/UnitySkipSplashScreen-main.meta
+Assets/LunarConsole.meta
