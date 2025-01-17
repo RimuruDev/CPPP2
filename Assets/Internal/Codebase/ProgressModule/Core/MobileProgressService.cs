@@ -76,19 +76,43 @@ namespace Internal
             idToLoadAction = new Dictionary<string, Action>
             {
                 {
-                    userProgressFile,
-                    () => UserProgress = new UserProgressProxy(LoadAllProgress(userProgressFile,
-                        DefaultProgressFactory.CreateDefaultProgress))
+                    userProgressFile, () =>
+                    {
+                        if(UserProgress is { Origin: not null })
+                        {
+                            Debug.Log($"<color=yellow>User Progress Disposed.</color>: {UserProgress}>");
+                            UserProgress?.Dispose();
+                        }
+                        
+                        UserProgress = new UserProgressProxy(LoadAllProgress(userProgressFile,
+                            DefaultProgressFactory.CreateDefaultProgress));
+                    }
                 },
                 {
-                    audioSettingsFile,
-                    () => AudioSettings = new AudioSettingsProxy(LoadAllProgress(audioSettingsFile,
-                        DefaultProgressFactory.CreateDefaultAudioSettings))
+                    audioSettingsFile, () =>
+                    {
+                        if(AudioSettings is { Origin: not null })
+                        {
+                            Debug.Log($"<color=yellow>Audio Settings Disposed.</color>: {AudioSettings}>");
+                            AudioSettings?.Dispose();
+                        }
+                        
+                        AudioSettings = new AudioSettingsProxy(LoadAllProgress(audioSettingsFile,
+                            DefaultProgressFactory.CreateDefaultAudioSettings));
+                    }
                 },
                 {
-                    worldProgressFile,
-                    () => WorldProgress = new WorldProgressProxy(LoadAllProgress(worldProgressFile,
-                        DefaultProgressFactory.CreateDefaultWorldProgress))
+                    worldProgressFile, () =>
+                    {
+                        if(WorldProgress is { Origin: not null })
+                        {
+                            Debug.Log($"<color=yellow>World Progress Disposed.</color>: {WorldProgress}>");
+                            WorldProgress?.Dispose();
+                        }
+                        
+                        WorldProgress = new WorldProgressProxy(LoadAllProgress(worldProgressFile,
+                            DefaultProgressFactory.CreateDefaultWorldProgress));
+                    }
                 }
             };
 
@@ -411,7 +435,7 @@ namespace Internal
                 if (idToLoadAction.TryGetValue(id, out var action))
                 {
                     action?.Invoke();
-                    
+
                     var targetProgress = (float)(i + 1) / totalSteps;
 
                     while (operation.Progress < targetProgress)
@@ -437,6 +461,7 @@ namespace Internal
             operation.UpdateProgress(0f, "Initializing...");
 
             var ids = idToSaveAction.Keys.ToList();
+            var totalSteps = ids.Count;
 
             for (var i = 0; i < ids.Count; i++)
             {
@@ -445,7 +470,19 @@ namespace Internal
                 if (idToSaveAction.TryGetValue(id, out var action))
                 {
                     action?.Invoke();
-                    operation.UpdateProgress((float)(i + 1) / ids.Count, $"Saved {id}");
+
+                    var targetProgress = (float)(i + 1) / totalSteps;
+
+                    while (operation.Progress < targetProgress)
+                    {
+                        operation.UpdateProgress(Mathf.MoveTowards(
+                                operation.Progress,
+                                targetProgress,
+                                Time.deltaTime * 0.5f),
+                            $"Saving {id}");
+
+                        yield return null;
+                    }
 
                     yield return null;
                 }
