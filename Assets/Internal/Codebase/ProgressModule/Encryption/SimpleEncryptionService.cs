@@ -16,17 +16,22 @@ namespace Internal
         public SimpleEncryptionService()
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
-            // Уникальный идентификатор устройства для Android //
-            // Так как я зае&*ся с безопасным хранилищем ведроида...
             var deviceId = DeviceKeyGenerator.GetDeviceUniqueId();
-            Key = Encoding.UTF8.GetBytes(deviceId.PadRight(32, '0'));  // Преобразуем в 32 байта //
-            IV = Encoding.UTF8.GetBytes(deviceId.PadRight(16, '0'));   // Преобразуем в 16 байт //
+            Key = Encoding.UTF8.GetBytes(deviceId.PadRight(32, '0'));  // Преобразуем в 32 байта
+            IV = Encoding.UTF8.GetBytes(deviceId.PadRight(16, '0'));   // Преобразуем в 16 байт
+
+            Debug.Log($"[SimpleEncryptionService] Android Key: {BitConverter.ToString(Key)}");
+            Debug.Log($"[SimpleEncryptionService] Android IV: {BitConverter.ToString(IV)}");
+
 #elif (UNITY_EDITOR || DEVELOPMENT_BUILD)
             // Константные ключи для Editor и Development Build
             Key = Encoding.UTF8.GetBytes("12345678901234567890123456789012");
             IV = Encoding.UTF8.GetBytes("1234567890123456");
+
+            Debug.Log("[SimpleEncryptionService] Using hardcoded key for development.");
+            Debug.Log($"[SimpleEncryptionService] Development Key: {BitConverter.ToString(Key)}");
+            Debug.Log($"[SimpleEncryptionService] Development IV: {BitConverter.ToString(IV)}");
 #else
-            // Для других платформ, например, Standalone, WebGL, fallback на хардкод ключ //
             (Key, IV) = EncryptionKeyManagement.GetOrCreateKeyAndIV();
 #endif
         }
@@ -44,7 +49,8 @@ namespace Internal
                     {
                         var plainBytes = Encoding.UTF8.GetBytes(plainText);
                         var encryptedBytes = PerformCryptography(plainBytes, encryptor);
-                        
+
+                        Debug.Log($"[SimpleEncryptionService] Encrypted: {Convert.ToBase64String(encryptedBytes)}");
                         return Convert.ToBase64String(encryptedBytes);
                     }
                 }
@@ -76,7 +82,9 @@ namespace Internal
                         var cipherBytes = Convert.FromBase64String(cipherText);
                         var decryptedBytes = PerformCryptography(cipherBytes, decryptor);
 
-                        return Encoding.UTF8.GetString(decryptedBytes);
+                        string decryptedText = Encoding.UTF8.GetString(decryptedBytes);
+                        Debug.Log($"[SimpleEncryptionService] Decrypted: {decryptedText}");
+                        return decryptedText;
                     }
                 }
             }
@@ -93,10 +101,7 @@ namespace Internal
 
             try
             {
-                // Проверяем, является ли строка допустимой Base64 //
                 var decoded = Convert.FromBase64String(data);
-
-                // Минимальная длина данных для шифрования AES //
                 return decoded.Length >= 16;
             }
             catch (FormatException)
@@ -126,8 +131,7 @@ namespace Internal
         private const string KeyPref = "EncryptedEncryptionKey";
         private const string IvPref = "EncryptedEncryptionIV";
 
-        // Пример ключа для зашифровки/расшифровки. Хотя при декомпайле пофигу что тут будет...
-        private static readonly byte[] MasterKey = Encoding.UTF8.GetBytes("MasterSecretKey1234567890123456"); 
+        private static readonly byte[] MasterKey = Encoding.UTF8.GetBytes("MasterSecretKey1234567890123456");
 
         public static (byte[] Key, byte[] IV) GetOrCreateKeyAndIV()
         {
@@ -136,21 +140,26 @@ namespace Internal
                 var key = GenerateRandomKey(32);
                 var iv = GenerateRandomKey(16);
 
-                // Шифруем ключ и IV перед сохранением //
                 var encryptedKey = EncryptWithMasterKey(key, MasterKey);
                 var encryptedIv = EncryptWithMasterKey(iv, MasterKey);
 
                 PlayerPrefs.SetString(KeyPref, Convert.ToBase64String(encryptedKey));
                 PlayerPrefs.SetString(IvPref, Convert.ToBase64String(encryptedIv));
                 PlayerPrefs.Save();
+
+                Debug.Log("[EncryptionKeyManagement] First time setup. Generated new key and IV.");
+                Debug.Log($"[EncryptionKeyManagement] Generated Key: {BitConverter.ToString(key)}");
+                Debug.Log($"[EncryptionKeyManagement] Generated IV: {BitConverter.ToString(iv)}");
             }
 
             var encryptedSavedKey = Convert.FromBase64String(PlayerPrefs.GetString(KeyPref));
             var encryptedSavedIv = Convert.FromBase64String(PlayerPrefs.GetString(IvPref));
 
-            // Расшифровываем ключ и IV //
             var key_ = DecryptWithMasterKey(encryptedSavedKey, MasterKey);
             var iv_ = DecryptWithMasterKey(encryptedSavedIv, MasterKey);
+
+            Debug.Log($"[EncryptionKeyManagement] Loaded Key: {BitConverter.ToString(key_)}");
+            Debug.Log($"[EncryptionKeyManagement] Loaded IV: {BitConverter.ToString(iv_)}");
 
             return (key_, iv_);
         }
