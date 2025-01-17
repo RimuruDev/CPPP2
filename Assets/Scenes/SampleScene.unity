@@ -244,6 +244,24 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   fileFormat: 0
+  UserProgress:
+    UserName: 
+    Level: 0
+    SoftCurrency: 0
+    HardCurrency: 0
+  AudioSettings:
+    BackgroundMusicVolume: 0
+    SfxVolume: 0
+  WorldProgress:
+    CurrentWorldPosition:
+      x: 0
+      y: 0
+      z: 0
+    CurrentWorldRotation:
+      x: 0
+      y: 0
+      z: 0
+    CurrentTime: 0
 --- !u!4 &675662802
 Transform:
   m_ObjectHideFlags: 0

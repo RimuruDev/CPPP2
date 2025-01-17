@@ -42,7 +42,7 @@ namespace Internal
 
             directoryPath = Path.Combine(Application.persistentDataPath, Constants.ROOT_FOLDER_NAME);
 
-            if (!Directory.Exists(directoryPath))
+            if (IsFirstLaunch())
                 Directory.CreateDirectory(directoryPath);
 
             const string userProgressFile = Constants.USER_PROGRESS_FILE;
@@ -95,15 +95,32 @@ namespace Internal
         public void SaveAllProgress()
         {
             foreach (var action in idToSaveAction.Values)
+            {
+                Debug.Log($"[Save Progress] {action}]");
                 action?.Invoke();
+            }
 
             Debug.Log("All progress saved successfully.");
         }
 
         public void LoadAllProgress()
         {
+            if (IsFirstLaunch())
+            {
+                Debug.Log("First launch detected. Initializing default progress.");
+
+                UserProgress = new UserProgressProxy(DefaultProgressFactory.CreateDefaultProgress());
+                AudioSettings = new AudioSettingsProxy(DefaultProgressFactory.CreateDefaultAudioSettings());
+                WorldProgress = new WorldProgressProxy(DefaultProgressFactory.CreateDefaultWorldProgress());
+
+                return;
+            }
+            
             foreach (var action in idToLoadAction.Values)
+            {
+                Debug.Log($"[Load Progress] {action}");
                 action?.Invoke();
+            }
 
             Debug.Log("All progress loaded successfully.");
         }
@@ -111,7 +128,10 @@ namespace Internal
         public void DeleteAllProgress()
         {
             foreach (var action in idToDeleteAction.Values)
+            {
+                Debug.Log($"[Delete Progress] {action}]");
                 action?.Invoke();
+            }
 
             Debug.Log("All progress deleted successfully.");
         }
@@ -121,7 +141,7 @@ namespace Internal
             if (idToSaveAction.TryGetValue(id, out var action))
             {
                 action?.Invoke();
-                Debug.Log($"Successfully saved progress for ID: {id}");
+                Debug.Log($"[Successfully saved progress for ID: {id}]");
             }
             else
             {
@@ -134,7 +154,7 @@ namespace Internal
             if (idToLoadAction.TryGetValue(id, out var action))
             {
                 action?.Invoke();
-                Debug.Log($"Successfully loaded progress for ID: {id}");
+                Debug.Log($"[Successfully loaded progress for ID: {id}]");
             }
             else
             {
@@ -147,7 +167,7 @@ namespace Internal
             if (idToDeleteAction.TryGetValue(id, out var action))
             {
                 action?.Invoke();
-                Debug.Log($"Successfully deleted progress for ID: {id}");
+                Debug.Log($"[Successfully deleted progress for ID: {id}]");
             }
             else
             {
@@ -172,8 +192,7 @@ namespace Internal
 
         private void SaveProgress<T>(string fileName, T data)
         {
-            var savePath = Path.Combine(directoryPath,
-                fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
+            var savePath = Path.Combine(directoryPath, fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
             var rawData = fileFormatConfig.CurrentFormatHandler.Serialize(data);
             var encryptedData = encryptionService.Encrypt(rawData);
 
@@ -217,15 +236,15 @@ namespace Internal
 
         private TData LoadAllProgress<TData>(string fileName, Func<TData> createDefault) where TData : class
         {
-            var filePath = Path.Combine(directoryPath,
-                fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
+            var fileFormat = fileFormatConfig.CurrentFormatHandler.GetFileExtension();
+            var filePath = Path.Combine(directoryPath, fileName + fileFormat);
 
             // === Выполняем миграцию, если необходимо! *Позже так же нужно будет упростить это место. 
             if (!dataStorage.Exists(filePath))
             {
                 Debug.Log($"File for '{fileName}' not found. Attempting migration.");
 
-                Type modelType = typeof(TData);
+                var modelType = typeof(TData);
 
                 var migrated = migrationService.TryMigrate(
                     directoryPath,
@@ -236,15 +255,20 @@ namespace Internal
 
                 if (!migrated)
                 {
-                    Debug.LogWarning(
-                        $"No valid save file found for '{fileName}' after migration. Initializing default data.");
+                    Debug.LogWarning($"No valid save file found for '{fileName}' after migration. " +
+                                     $"Initializing default data.");
+                    
                     return createDefault();
                 }
             }
 
             var rawData = dataStorage.Load(filePath);
-            var decryptedData = encryptionService.IsEncrypted(rawData) ? encryptionService.Decrypt(rawData) : rawData;
+            
+            var decryptedData = encryptionService.IsEncrypted(rawData) 
+                ? encryptionService.Decrypt(rawData) 
+                : rawData;
 
+            // Validation Layer ===
             try
             {
                 var progress = fileFormatConfig.CurrentFormatHandler.Deserialize<TData>(decryptedData);
@@ -272,8 +296,9 @@ namespace Internal
         private void DeleteProgress(string fileName)
         {
             Debug.Log($"<color=red>Deleting file '{fileName}'.</color>");
-            var filePath = Path.Combine(directoryPath,
-                fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
+            
+            var fileFormat = fileFormatConfig.CurrentFormatHandler.GetFileExtension();
+            var filePath = Path.Combine(directoryPath, fileName + fileFormat);
 
             if (dataStorage.Exists(filePath))
             {
@@ -292,6 +317,43 @@ namespace Internal
                 }
             }
 #endif
+        }
+
+        #endregion
+
+        #region Internal
+
+        /// <summary>
+        /// Проверяет, является ли это первый вход.
+        /// </summary>
+        /// <returns>
+        /// true - Это первый запуск игры
+        /// false - Игрок как минимум 1 раз сохранялся.
+        /// </returns>
+        private bool IsFirstLaunch()
+        {
+            //
+            // Проверяем наличие папки Database. Мне ульттра важно что бы запуск игры был быстрый.
+            // По этому по этому признаку буду проверять, первый запуск иры или нет.
+            //
+            if (!Directory.Exists(directoryPath))
+            {
+                Debug.Log($"<color=yellow>[FirstLaunch] Directory doesn't exist. Creating it.]</color>");
+                return true;
+            }
+
+            //
+            // Проверяем, есть ли файлы в папке.
+            // На случай если CleanMaster или пользователь удалил файлы сейва или же по ошибке какой нибудь.
+            // Так же это пригодиться для того что бы можно было папки создать, а потом уже все остальное :3
+            //
+            var files = Directory.GetFiles(directoryPath);
+
+            var existFiles = files.Length == 0;
+
+            Debug.Log($"<color=yellow>[FirstLaunch] Found {files.Length} file(s) in directory.</color>");
+            
+            return existFiles;
         }
 
         #endregion
