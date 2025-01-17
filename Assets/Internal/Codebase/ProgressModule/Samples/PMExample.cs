@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using Internal.Codebase.ProgressModule.Models.Gameplay;
 
 namespace Internal
 {
@@ -40,9 +41,16 @@ namespace Internal
             // progressService.SaveProgressById(Constants.AUDIO_SETTINGS_FILE);
             
             progressService.LoadAllProgress();
-            progressService.SaveAllProgress();
+            // progressService.SaveAllProgress();
+
+            UserProgress = progressService.UserProgress.Origin;
+            AudioSettings= progressService.AudioSettings.Origin;
+            WorldProgress= progressService.WorldProgress.Origin;
         }
 
+        public UserProgress  UserProgress;
+        public AudioSettings AudioSettings;
+        public WorldProgress WorldProgress;
 
         [ContextMenu(nameof(TestSave))]
         public void TestSave()
@@ -50,9 +58,13 @@ namespace Internal
             progressService.UserProgress.SoftCurrency.Value += 100;
             progressService.AudioSettings.BackgroundMusicVolume.Value -= 0.22f;
             progressService.AudioSettings.SfxVolume.Value += GetRandom01();
+            progressService.WorldProgress.CurrentWorldPosition.Value = new Vector3Data(Random.value, Random.value, Random.value);
+            progressService.WorldProgress.CurrentWorldRotation.Value = new Vector3Data(Random.value, Random.value, Random.value);
+            progressService.WorldProgress.CurrentTime.Value = Random.value;
 
             progressService.SaveProgressById(Constants.USER_PROGRESS_FILE);
             progressService.SaveProgressById(Constants.AUDIO_SETTINGS_FILE);
+            progressService.SaveProgressById(Constants.WORLD_PROGRESS_FILE);
         }
 
         [ContextMenu("_" + nameof(ChangeUserProgress))]
