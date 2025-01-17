@@ -23,11 +23,16 @@ namespace Internal
         [SerializeField] private Slider saveProgressBar;
         [SerializeField] private TMP_Text saveProgressText;
 
+        // == delete
+        [SerializeField] private Slider deleteProgressBar; 
+        [SerializeField] private TMP_Text deleteProgressText; 
+
         // == btns
         [SerializeField] private Button saveButton;
         [SerializeField] private Button loadButton;
+        [SerializeField] private Button deleteButton;
 
-        private MobileProgressService progressService;
+        private IProgressService progressService;
 
         private void Awake()
         {
@@ -39,12 +44,9 @@ namespace Internal
 
             var fileFormatConfig = fileFormat switch
             {
-                FileFormatType.Json => new FileFormatConfiguration(currentHandler: jsonHandler,
-                    supportedHandlers: new List<IFileFormatHandler> { jsonHandler, binaryHandler }),
-                FileFormatType.Binary => new FileFormatConfiguration(currentHandler: binaryHandler,
-                    supportedHandlers: new List<IFileFormatHandler> { jsonHandler, binaryHandler }),
-                _ => new FileFormatConfiguration(currentHandler: jsonHandler,
-                    supportedHandlers: new List<IFileFormatHandler> { jsonHandler, binaryHandler })
+                FileFormatType.Json => new FileFormatConfiguration(currentHandler: jsonHandler, supportedHandlers: new List<IFileFormatHandler> { jsonHandler, binaryHandler }),
+                FileFormatType.Binary => new FileFormatConfiguration(currentHandler: binaryHandler, supportedHandlers: new List<IFileFormatHandler> { jsonHandler, binaryHandler }),
+                _ => new FileFormatConfiguration(currentHandler: jsonHandler, supportedHandlers: new List<IFileFormatHandler> { jsonHandler, binaryHandler })
             };
 
             var migrationService = new ProgressMigrationService(dataStorage, encryptionService);
@@ -72,6 +74,7 @@ namespace Internal
 
             saveButton.onClick.AddListener(TestSaveWithUI);
             loadButton.onClick.AddListener(TestLoadWithUI);
+            deleteButton.onClick.AddListener(TestDeleteWithUI);
         }
 
         // private IEnumerator Start()
@@ -106,6 +109,16 @@ namespace Internal
             StartCoroutine(UpdateSaveProgressUI(saveOperation));
             StartCoroutine(progressService.SaveAllProgressCoroutine(saveOperation));
         }
+        
+        [ContextMenu("____" +nameof(TestDeleteWithUI))]
+        public void TestDeleteWithUI()
+        {
+            var deleteOperation = new ProgressOperation();
+
+            StartCoroutine(UpdateDeleteProgressUI(deleteOperation));
+            StartCoroutine(progressService.DeleteAllProgressCoroutine(deleteOperation));
+        }
+
 
         private IEnumerator UpdateProgressUI(ProgressOperation operation)
         {
@@ -132,6 +145,20 @@ namespace Internal
             saveProgressBar.value = 1f;
             saveProgressText.text = $"Status: {operation.Status}\nProgress: 100%";
         }
+        
+        private IEnumerator UpdateDeleteProgressUI(ProgressOperation operation)
+        {
+            while (!operation.IsDone)
+            {
+                deleteProgressBar.value = operation.Progress;
+                deleteProgressText.text = $"Status: {operation.Status}\nProgress: {operation.Progress * 100:F1}%";
+                yield return null;
+            }
+
+            deleteProgressBar.value = 1f;
+            deleteProgressText.text = $"Status: {operation.Status}\nProgress: 100%";
+        }
+
 
         [ContextMenu(nameof(TestSave))]
         public void TestSave()

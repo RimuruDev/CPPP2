@@ -490,6 +490,42 @@ namespace Internal
 
             operation.Complete("All progress saved successfully.");
         }
+        
+        public IEnumerator DeleteAllProgressCoroutine(ProgressOperation operation)
+        {
+            operation.UpdateProgress(0f, "Initializing...");
+
+            var ids = idToDeleteAction.Keys.ToList();
+            var totalSteps = ids.Count;
+
+            for (var i = 0; i < ids.Count; i++)
+            {
+                var id = ids[i];
+
+                if (idToDeleteAction.TryGetValue(id, out var action))
+                {
+                    action?.Invoke();
+
+                    var targetProgress = (float)(i + 1) / totalSteps;
+
+                    while (operation.Progress < targetProgress)
+                    {
+                        operation.UpdateProgress(Mathf.MoveTowards(
+                                operation.Progress,
+                                targetProgress,
+                                Time.deltaTime * 0.5f),
+                            $"Deleting {id}");
+
+                        yield return null;
+                    }
+
+                    yield return null;
+                }
+            }
+
+            operation.Complete("All progress deleted successfully.");
+        }
+
 
         #endregion
     }
