@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using System.Collections.Generic;
 using Internal.Codebase.ProgressModule.Models.Gameplay;
@@ -6,7 +7,12 @@ namespace Internal
 {
     public class PMExample : MonoBehaviour
     {
+        // Debug only
+        public UserProgress  UserProgress;
+        public AudioSettings AudioSettings;
+        public WorldProgress WorldProgress;
         [SerializeField] private FileFormatType fileFormat;
+        
         private MobileProgressService progressService;
 
         private void Awake()
@@ -39,19 +45,29 @@ namespace Internal
             //
             // progressService.SaveProgressById(Constants.USER_PROGRESS_FILE);
             // progressService.SaveProgressById(Constants.AUDIO_SETTINGS_FILE);
-            
-            progressService.LoadAllProgress();
+
             // progressService.SaveAllProgress();
 
+            // progressService.LoadAllProgress();
+            // UserProgress = progressService.UserProgress.Origin;
+            // AudioSettings= progressService.AudioSettings.Origin;
+            // WorldProgress= progressService.WorldProgress.Origin;
+        }
+        
+        private IEnumerator Start()
+        {
+            var loadOperation = new ProgressOperation();
+            yield return StartCoroutine(progressService.LoadAllProgressCoroutine(loadOperation));
+            
             UserProgress = progressService.UserProgress.Origin;
             AudioSettings= progressService.AudioSettings.Origin;
             WorldProgress= progressService.WorldProgress.Origin;
+            
+            Debug.Log($"Loading complete: {loadOperation.Status}");
+            Debug.Log($"Progress: {loadOperation.Progress}");
         }
 
-        public UserProgress  UserProgress;
-        public AudioSettings AudioSettings;
-        public WorldProgress WorldProgress;
-
+        
         [ContextMenu(nameof(TestSave))]
         public void TestSave()
         {
