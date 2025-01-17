@@ -159,6 +159,33 @@ namespace Internal
             deleteProgressText.text = $"Status: {operation.Status}\nProgress: 100%";
         }
 
+        [ContextMenu(nameof(TestSaveByIdWithUI))]
+        public void TestSaveByIdWithUI()
+        {
+            var saveOperation = new ProgressOperation();
+
+            StartCoroutine(UpdateSaveProgressUI(saveOperation)); 
+            StartCoroutine(progressService.SaveProgressByIdCoroutine(Constants.USER_PROGRESS_FILE, saveOperation));
+        }
+
+        [ContextMenu(nameof(TestLoadByIdWithUI))]
+        public void TestLoadByIdWithUI()
+        {
+            var loadOperation = new ProgressOperation();
+
+            StartCoroutine(UpdateProgressUI(loadOperation));
+            StartCoroutine(progressService.LoadProgressByIdCoroutine(Constants.USER_PROGRESS_FILE, loadOperation));
+        }
+
+        [ContextMenu(nameof(TestDeleteByIdWithUI))]
+        public void TestDeleteByIdWithUI()
+        {
+            var deleteOperation = new ProgressOperation();
+
+            StartCoroutine(UpdateDeleteProgressUI(deleteOperation));
+            StartCoroutine(progressService.DeleteProgressByIdCoroutine(Constants.USER_PROGRESS_FILE, deleteOperation));
+        }
+
 
         [ContextMenu(nameof(TestSave))]
         public void TestSave()

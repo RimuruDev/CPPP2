@@ -30,10 +30,18 @@ public interface IProgressService : IDisposable
     public void DeleteProgressById(string id);
     
     // NOTE:
-    // Более сложный API, не желателем для WEBGL (YG).
+    // Упрощенный API, не желателем для WEBGL (YG).
     // Предпочтителен для всех остальных сценариев кроме WEBGL (YG).
     // Псевдо асинхронность - размазывает операции по кадрам, из-за чего не будет фриза при загрузки или сохранении.
     public IEnumerator SaveAllProgressCoroutine(ProgressOperation operation);
     public IEnumerator LoadAllProgressCoroutine(ProgressOperation operation);
     public IEnumerator DeleteAllProgressCoroutine(ProgressOperation operation);
+    
+    // NOTE:
+    // Более сложный API, не желателем для WEBGL (YG).
+    // Предпочтителен для всех остальных сценариев кроме WEBGL (YG).
+    // Псевдо асинхронность - размазывает операции по кадрам, из-за чего не будет фриза при загрузки или сохранении.
+    public IEnumerator SaveProgressByIdCoroutine(string id, ProgressOperation operation);
+    public IEnumerator LoadProgressByIdCoroutine(string id, ProgressOperation operation);
+    public IEnumerator DeleteProgressByIdCoroutine(string id, ProgressOperation operation);
 }

@@ -27,8 +27,7 @@ namespace Internal
             Status = status;
         }
     }
-
-
+    
     public static class Constants
     {
         public const string ROOT_FOLDER_NAME = "Database";
@@ -526,6 +525,99 @@ namespace Internal
             operation.Complete("All progress deleted successfully.");
         }
 
+        public IEnumerator SaveProgressByIdCoroutine(string id, ProgressOperation operation)
+        {
+            operation.UpdateProgress(0f, $"Initializing save for ID: {id}");
+
+            if (idToSaveAction.TryGetValue(id, out var action))
+            {
+                action?.Invoke();
+
+                // NOTE: Для одного ID прогресс всегда равен 100%
+                // Пока не буду в константы выносить, пусть будет так пока что для простоты.
+                var targetProgress = 1f;
+
+                while (operation.Progress < targetProgress)
+                {
+                    operation.UpdateProgress(Mathf.MoveTowards(
+                            operation.Progress,
+                            targetProgress,
+                            Time.deltaTime * 0.5f),
+                        $"Saving {id}");
+
+                    yield return null;
+                }
+
+                operation.Complete($"Save for ID {id} completed successfully.");
+            }
+            else
+            {
+                operation.Complete($"Unknown ID: {id}. Save skipped.");
+                Debug.LogWarning($"Unknown progress ID: {id}");
+            }
+        }
+
+        public IEnumerator LoadProgressByIdCoroutine(string id, ProgressOperation operation)
+        {
+            operation.UpdateProgress(0f, $"Initializing load for ID: {id}");
+
+            if (idToLoadAction.TryGetValue(id, out var action))
+            {
+                action?.Invoke();
+
+                // NOTE: Для одного ID прогресс всегда равен 100%
+                // Так же я продублировал в сейве и удалении файла, при рефакторе надо бы учесть это.
+                var targetProgress = 1f; 
+
+                while (operation.Progress < targetProgress)
+                {
+                    operation.UpdateProgress(Mathf.MoveTowards(
+                            operation.Progress,
+                            targetProgress,
+                            Time.deltaTime * 0.5f),
+                        $"Loading {id}");
+
+                    yield return null;
+                }
+
+                operation.Complete($"Load for ID {id} completed successfully.");
+            }
+            else
+            {
+                operation.Complete($"Unknown ID: {id}. Load skipped.");
+                Debug.LogWarning($"Unknown progress ID: {id}");
+            }
+        }
+
+        public IEnumerator DeleteProgressByIdCoroutine(string id, ProgressOperation operation)
+        {
+            operation.UpdateProgress(0f, $"Initializing delete for ID: {id}");
+
+            if (idToDeleteAction.TryGetValue(id, out var action))
+            {
+                action?.Invoke();
+
+                var targetProgress = 1f;
+
+                while (operation.Progress < targetProgress)
+                {
+                    operation.UpdateProgress(Mathf.MoveTowards(
+                            operation.Progress,
+                            targetProgress,
+                            Time.deltaTime * 0.5f),
+                        $"Deleting {id}"); // TODO: Передавать enum что бы можно было локализировать.
+
+                    yield return null;
+                }
+
+                operation.Complete($"Delete for ID {id} completed successfully.");
+            }
+            else
+            {
+                operation.Complete($"Unknown ID: {id}. Delete skipped.");
+                Debug.LogWarning($"Unknown progress ID: {id}");
+            }
+        }
 
         #endregion
     }
