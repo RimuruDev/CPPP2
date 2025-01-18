@@ -31,9 +31,16 @@ namespace Internal
     public static class Constants
     {
         public const string ROOT_FOLDER_NAME = "Database";
-        public const string USER_PROGRESS_FILE = "user_progress";
-        public const string AUDIO_SETTINGS_FILE = "audio_settings";
-        public const string WORLD_PROGRESS_FILE = "world_progress";
+
+        // public const string USER_PROGRESS_FILE = "user_progress";
+        public static string USER_PROGRESS_FILE = FileUtility.GetEncryptedFileName("user_progress");
+
+        // public const string AUDIO_SETTINGS_FILE = "audio_settings";
+        public static string AUDIO_SETTINGS_FILE = FileUtility.GetEncryptedFileName("audio_settings");
+
+
+        // public const string WORLD_PROGRESS_FILE = "world_progress";
+        public static string WORLD_PROGRESS_FILE = FileUtility.GetEncryptedFileName("world_progress");
     }
 
     public class MobileProgressService : IProgressService
@@ -72,9 +79,9 @@ namespace Internal
                 fakeKeyGenerator.StartDelayedFakeKeyGeneration();
             }
 
-            const string userProgressFile = Constants.USER_PROGRESS_FILE;
-            const string audioSettingsFile = Constants.AUDIO_SETTINGS_FILE;
-            const string worldProgressFile = Constants.WORLD_PROGRESS_FILE;
+            var userProgressFile = Constants.USER_PROGRESS_FILE;
+            var audioSettingsFile = Constants.AUDIO_SETTINGS_FILE;
+            var worldProgressFile = Constants.WORLD_PROGRESS_FILE;
 
             // Маппинг ID на действия //
             idToLoadAction = new Dictionary<string, Action>
@@ -412,23 +419,25 @@ namespace Internal
             //
             // Вообще по одному файлу достаточно, так как если нет основного, можно все офнуть, ибо нефиг лезть в файлы :3
             //
-            var requiredFiles = new[]
-            {
-                Path.Combine(directoryPath, Constants.USER_PROGRESS_FILE),
-                Path.Combine(directoryPath, Constants.AUDIO_SETTINGS_FILE),
-            };
+            // var requiredFiles = new[]
+            // {
+            //     Path.Combine(directoryPath, Constants.USER_PROGRESS_FILE + fileFormatConfig.CurrentFormatHandler.GetFileExtension()),
+            //     Path.Combine(directoryPath, Constants.AUDIO_SETTINGS_FILE + fileFormatConfig.CurrentFormatHandler.GetFileExtension()),
+            // };
+            //
+            // // Проверяем, все ли необходимые файлы существуют //
+            // foreach (var file in requiredFiles)
+            // {
+            //     Debug.Log($"file: {file}");
+            //     
+            //     if (!File.Exists(file))
+            //     {
+            //         Debug.Log($"<color=yellow>[FirstLaunch] Missing required file: {file}.</color>");
+            //         return true;
+            //     }
+            // }
 
-            // Проверяем, все ли необходимые файлы существуют //
-            foreach (var file in requiredFiles)
-            {
-                if (!File.Exists(file))
-                {
-                    Debug.Log($"<color=yellow>[FirstLaunch] Missing required file: {file}.</color>");
-                    return true;
-                }
-            }
-
-            Debug.Log("<color=yellow>[FirstLaunch] All required files found, not the first launch.</color>");
+            Debug.Log("<color=yellow>[NO FirstLaunch] All required files found, not the first launch.</color>");
             return false;
         }
 
