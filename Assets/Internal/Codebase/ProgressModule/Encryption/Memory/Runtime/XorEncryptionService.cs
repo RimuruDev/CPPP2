@@ -15,6 +15,7 @@ namespace Internal
             XorEncryptionService.DecryptIntWithXor(encryptedValue);
 
 
+        
         public static byte[] EncryptFloat(float value) =>
             XorEncryptionService.EncryptFloatWithXor(value);
 
@@ -34,18 +35,37 @@ namespace Internal
             XorEncryptionService.DecryptListWithXor(encryptedList);
 
 
+        
         public static byte[] Encrypt(byte[] data) =>
             XorEncryptionService.EncryptWithXor(data);
 
         public static byte[] Decrypt(byte[] encryptedData) =>
             XorEncryptionService.DecryptWithXor(encryptedData);
 
+        
 
         public static string Encrypt(string value) =>
             XorEncryptionService.EncryptWithXor(value);
 
         public static string Decrypt(string encryptedValue) =>
             XorEncryptionService.DecryptWithXor(encryptedValue);
+
+        
+        
+        public static byte[] SerializeObject(object obj) =>
+            XorEncryptionService.SerializeObject(obj);
+
+        public static object DeserializeObject(byte[] data) =>
+            XorEncryptionService.DeserializeObject(data);
+
+        public static T DeserializeObject<T>(byte[] data) =>
+            XorEncryptionService.DeserializeObject<T>(data);
+
+        public static byte[] EncryptObjectWithXor(object obj) =>
+            XorEncryptionService.EncryptObjectWithXor(obj);
+
+        public static object DecryptObjectWithXor(byte[] encryptedData) =>
+            XorEncryptionService.DecryptObjectWithXor(encryptedData);
     }
 
     public static class XorEncryptionService
@@ -177,7 +197,12 @@ namespace Internal
                 return formatter.Deserialize(stream);
             }
         }
-        
+
+        /// <summary>
+        /// Восстановление объекта из байтового массива
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
         public static T DeserializeObject<T>(byte[] data)
         {
             IFormatter formatter = new BinaryFormatter();
