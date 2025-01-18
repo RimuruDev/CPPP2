@@ -1,8 +1,6 @@
 using NUnit.Framework;
 using System.Collections.Generic;
-using System.IO;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Internal.Tests
 {
@@ -33,6 +31,7 @@ namespace Internal.Tests
         }
 
         [Test]
+        [SuppressMessage("ReSharper", "ConditionIsAlwaysTrueOrFalse")]
         public void EncryptDecryptBool_WithXor_ShouldReturnOriginalValue()
         {
             var originalValue = true;
