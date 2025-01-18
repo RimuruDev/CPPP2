@@ -27,7 +27,7 @@ namespace Internal
             Status = status;
         }
     }
-    
+
     public static class Constants
     {
         public const string ROOT_FOLDER_NAME = "Database";
@@ -77,40 +77,37 @@ namespace Internal
                 {
                     userProgressFile, () =>
                     {
-                        if(UserProgress is { Origin: not null })
+                        if (UserProgress is { Origin: not null })
                         {
                             Debug.Log($"<color=yellow>User Progress Disposed.</color>: {UserProgress}>");
                             UserProgress?.Dispose();
                         }
-                        
-                        UserProgress = new UserProgressProxy(LoadAllProgress(userProgressFile,
-                            DefaultProgressFactory.CreateDefaultProgress));
+
+                        UserProgress = new UserProgressProxy(LoadAllProgress(userProgressFile, DefaultProgressFactory.CreateDefaultProgress));
                     }
                 },
                 {
                     audioSettingsFile, () =>
                     {
-                        if(AudioSettings is { Origin: not null })
+                        if (AudioSettings is { Origin: not null })
                         {
                             Debug.Log($"<color=yellow>Audio Settings Disposed.</color>: {AudioSettings}>");
                             AudioSettings?.Dispose();
                         }
-                        
-                        AudioSettings = new AudioSettingsProxy(LoadAllProgress(audioSettingsFile,
-                            DefaultProgressFactory.CreateDefaultAudioSettings));
+
+                        AudioSettings = new AudioSettingsProxy(LoadAllProgress(audioSettingsFile, DefaultProgressFactory.CreateDefaultAudioSettings));
                     }
                 },
                 {
                     worldProgressFile, () =>
                     {
-                        if(WorldProgress is { Origin: not null })
+                        if (WorldProgress is { Origin: not null })
                         {
                             Debug.Log($"<color=yellow>World Progress Disposed.</color>: {WorldProgress}>");
                             WorldProgress?.Dispose();
                         }
-                        
-                        WorldProgress = new WorldProgressProxy(LoadAllProgress(worldProgressFile,
-                            DefaultProgressFactory.CreateDefaultWorldProgress));
+
+                        WorldProgress = new WorldProgressProxy(LoadAllProgress(worldProgressFile, DefaultProgressFactory.CreateDefaultWorldProgress));
                     }
                 }
             };
@@ -118,9 +115,9 @@ namespace Internal
             // Маппинг ID на действия сохранения //
             idToSaveAction = new Dictionary<string, Action>
             {
-                { userProgressFile, () => SaveProgress(userProgressFile, UserProgress.Origin) },
-                { audioSettingsFile, () => SaveProgress(audioSettingsFile, AudioSettings.Origin) },
-                { worldProgressFile, () => SaveProgress(worldProgressFile, WorldProgress.Origin) }
+                { userProgressFile, () => { SaveProgress(userProgressFile, UserProgress?.Origin); } },
+                { audioSettingsFile, () => { SaveProgress(audioSettingsFile, AudioSettings?.Origin); } },
+                { worldProgressFile, () => { SaveProgress(worldProgressFile, WorldProgress?.Origin); } }
             };
 
             // Маппинг ID на действия удаления //
@@ -238,15 +235,20 @@ namespace Internal
 
         private void SaveProgress<T>(string fileName, T data)
         {
-            var savePath = Path.Combine(directoryPath,
-                fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
+            if (data == null)
+            {
+                Debug.Log("You attempted to save a null object.");
+                return;
+            }
+
+            var savePath = Path.Combine(directoryPath, fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
             var rawData = fileFormatConfig.CurrentFormatHandler.Serialize(data);
             var encryptedData = encryptionService.Encrypt(rawData);
 
             // Сохранение основного файла //
             // NOTE: Покрыть тестами на время выполнения.
             dataStorage.Save(savePath, encryptedData);
-            
+
             Debug.Log($"Encrypt:Save | {fileName}: {encryptedData}");
 
 #if UNITY_EDITOR
@@ -312,34 +314,41 @@ namespace Internal
             }
 
             var rawData = dataStorage.Load(filePath);
-
-            var decryptedData = encryptionService.IsEncrypted(rawData)
-                ? encryptionService.Decrypt(rawData)
-                : rawData;
-
-            Debug.Log($"Decrypt | {fileName}: {decryptedData}");
-
-            // Validation Layer ===
             try
             {
-                var progress = fileFormatConfig.CurrentFormatHandler.Deserialize<TData>(decryptedData);
+                var decryptedData = encryptionService.IsEncrypted(rawData)
+                    ? encryptionService.Decrypt(rawData)
+                    : rawData;
 
-                // === Валидация данных! | Я точно однажды забуду про это место, черкануть в доку нужно 100%
-                if (typeof(TData) == typeof(UserProgress) && !validator.IsValid((UserProgress)(object)progress))
-                    throw new InvalidDataException("Invalid UserProgress data.");
+                Debug.Log($"Decrypt | {fileName}: {decryptedData}");
 
-                if (typeof(TData) == typeof(AudioSettings) && !validator.IsValid((AudioSettings)(object)progress))
-                    throw new InvalidDataException("Invalid AudioSettings data.");
+                // Validation Layer ===
+                try
+                {
+                    var progress = fileFormatConfig.CurrentFormatHandler.Deserialize<TData>(decryptedData);
 
-                if (typeof(TData) == typeof(WorldProgress) && !validator.IsValid((WorldProgress)(object)progress))
-                    throw new InvalidDataException("Invalid WorldProgress data.");
+                    // === Валидация данных! | Я точно однажды забуду про это место, черкануть в доку нужно 100%
+                    if (typeof(TData) == typeof(UserProgress) && !validator.IsValid((UserProgress)(object)progress))
+                        throw new InvalidDataException("[Validation Layer] Invalid UserProgress data.");
+
+                    if (typeof(TData) == typeof(AudioSettings) && !validator.IsValid((AudioSettings)(object)progress))
+                        throw new InvalidDataException("[Validation Layer] Invalid AudioSettings data.");
+
+                    if (typeof(TData) == typeof(WorldProgress) && !validator.IsValid((WorldProgress)(object)progress))
+                        throw new InvalidDataException("[Validation Layer] Invalid WorldProgress data.");
 
 
-                return progress;
+                    return progress;
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"[Catch Validation Layer] Failed to load progress: {e.Message}. Initializing default data.");
+                    return createDefault();
+                }
             }
-            catch (Exception e)
+            catch (InvalidDataException invalidDataException)
             {
-                Debug.LogWarning($"Failed to load progress: {e.Message}. Initializing default data.");
+                Debug.LogWarning($"[Decrypt -> [Pre Validation Layer]] -> Failed to load progress: {invalidDataException.Message}");
                 return createDefault();
             }
         }
@@ -493,7 +502,7 @@ namespace Internal
 
             operation.Complete("All progress saved successfully.");
         }
-        
+
         public IEnumerator DeleteAllProgressCoroutine(ProgressOperation operation)
         {
             operation.UpdateProgress(0f, "Initializing...");
@@ -571,7 +580,7 @@ namespace Internal
 
                 // NOTE: Для одного ID прогресс всегда равен 100%
                 // Так же я продублировал в сейве и удалении файла, при рефакторе надо бы учесть это.
-                var targetProgress = 1f; 
+                var targetProgress = 1f;
 
                 while (operation.Progress < targetProgress)
                 {
