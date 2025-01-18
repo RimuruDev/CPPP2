@@ -246,6 +246,8 @@ namespace Internal
             // Сохранение основного файла //
             // NOTE: Покрыть тестами на время выполнения.
             dataStorage.Save(savePath, encryptedData);
+            
+            Debug.Log($"Encrypt:Save | {fileName}: {encryptedData}");
 
 #if UNITY_EDITOR
             var editorPath = Path.Combine(directoryPath,
@@ -314,6 +316,8 @@ namespace Internal
             var decryptedData = encryptionService.IsEncrypted(rawData)
                 ? encryptionService.Decrypt(rawData)
                 : rawData;
+
+            Debug.Log($"Decrypt | {fileName}: {decryptedData}");
 
             // Validation Layer ===
             try

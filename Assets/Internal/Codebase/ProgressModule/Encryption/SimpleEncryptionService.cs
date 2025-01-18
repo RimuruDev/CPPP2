@@ -1,46 +1,43 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
-using UnityEngine.Scripting;
+using System.Collections.Generic;
+using System.Security.Cryptography;
 
 namespace Internal
 {
+    /// <summary>
+    /// Сервис для шифрования данных с использованием AES и нескольких фейковых ключей для защиты настоящего ключа.
+    /// </summary>
     public class SimpleEncryptionService : IEncryptionService
     {
-        private readonly byte[] Key;
-        private readonly byte[] IV;
+        private byte[] Key;
+        private byte[] IV;
 
+        /// <summary>
+        /// Конструктор, который либо загружает существующий зашифрованный ключ из PlayerPrefs, 
+        /// либо генерирует и сохраняет новый.
+        /// </summary>
         public SimpleEncryptionService()
         {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            var deviceId = DeviceKeyGenerator.GetDeviceUniqueId();
-            Key = Encoding.UTF8.GetBytes(deviceId.PadRight(32, '0'));  // Преобразуем в 32 байта
-            IV = Encoding.UTF8.GetBytes(deviceId.PadRight(16, '0'));   // Преобразуем в 16 байт
-
-            Debug.Log($"[SimpleEncryptionService] Android Key: {BitConverter.ToString(Key)}");
-            Debug.Log($"[SimpleEncryptionService] Android IV: {BitConverter.ToString(IV)}");
-
-#elif (UNITY_EDITOR || DEVELOPMENT_BUILD)
-            // Константные ключи для Editor и Development Build
-            Key = Encoding.UTF8.GetBytes("12345678901234567890123456789012");
-            IV = Encoding.UTF8.GetBytes("1234567890123456");
-
-            Debug.Log("[SimpleEncryptionService] Using hardcoded key for development.");
-            Debug.Log($"[SimpleEncryptionService] Development Key: {BitConverter.ToString(Key)}");
-            Debug.Log($"[SimpleEncryptionService] Development IV: {BitConverter.ToString(IV)}");
-#else
-            (Key, IV) = EncryptionKeyManagement.GetOrCreateKeyAndIV();
-#endif
+            if (PlayerPrefs.HasKey(EncryptionConstants.EncryptedKeyPref))
+                LoadKey();
+            else
+                GenerateAndSaveKey(); // TODO: Генерировать фейки можно асинхронно, что бы не замедлять на 1-2 секунды запуск игры.
         }
 
+        /// <summary>
+        /// Шифрует текст с использованием AES.
+        /// </summary>
+        /// <param name="plainText">Текст для шифрования.</param>
+        /// <returns>Зашифрованный текст в формате Base64.</returns>
         public string Encrypt(string plainText)
         {
             try
             {
-                using (Aes aes = Aes.Create())
+                using (var aes = Aes.Create())
                 {
                     aes.Key = Key;
                     aes.IV = IV;
@@ -50,7 +47,6 @@ namespace Internal
                         var plainBytes = Encoding.UTF8.GetBytes(plainText);
                         var encryptedBytes = PerformCryptography(plainBytes, encryptor);
 
-                        Debug.Log($"[SimpleEncryptionService] Encrypted: {Convert.ToBase64String(encryptedBytes)}");
                         return Convert.ToBase64String(encryptedBytes);
                     }
                 }
@@ -62,6 +58,11 @@ namespace Internal
             }
         }
 
+        /// <summary>
+        /// Дешифрует текст с использованием AES.
+        /// </summary>
+        /// <param name="cipherText">Зашифрованный текст в формате Base64.</param>
+        /// <returns>Дешифрованный текст.</returns>
         public string Decrypt(string cipherText)
         {
             if (!IsEncrypted(cipherText))
@@ -72,7 +73,7 @@ namespace Internal
 
             try
             {
-                using (Aes aes = Aes.Create())
+                using (var aes = Aes.Create())
                 {
                     aes.Key = Key;
                     aes.IV = IV;
@@ -82,9 +83,7 @@ namespace Internal
                         var cipherBytes = Convert.FromBase64String(cipherText);
                         var decryptedBytes = PerformCryptography(cipherBytes, decryptor);
 
-                        string decryptedText = Encoding.UTF8.GetString(decryptedBytes);
-                        Debug.Log($"[SimpleEncryptionService] Decrypted: {decryptedText}");
-                        return decryptedText;
+                        return Encoding.UTF8.GetString(decryptedBytes);
                     }
                 }
             }
@@ -95,6 +94,11 @@ namespace Internal
             }
         }
 
+        /// <summary>
+        /// Проверяет, является ли строка зашифрованной.
+        /// </summary>
+        /// <param name="data">Строка для проверки.</param>
+        /// <returns>True, если строка зашифрована, иначе False.</returns>
         public bool IsEncrypted(string data)
         {
             if (string.IsNullOrWhiteSpace(data)) return false;
@@ -102,7 +106,8 @@ namespace Internal
             try
             {
                 var decoded = Convert.FromBase64String(data);
-                return decoded.Length >= 16;
+              
+                return decoded.Length >= EncryptionConstants.MinEncryptedDataLength;
             }
             catch (FormatException)
             {
@@ -110,6 +115,12 @@ namespace Internal
             }
         }
 
+        /// <summary>
+        /// Выполняет криптографическую операцию (шифрование или дешифрование) с использованием указанного крипто-потока.
+        /// </summary>
+        /// <param name="data">Данные для шифрования или дешифрования.</param>
+        /// <param name="cryptoTransform">Трансформер криптографической операции.</param>
+        /// <returns>Результат криптографической операции.</returns>
         private byte[] PerformCryptography(byte[] data, ICryptoTransform cryptoTransform)
         {
             using (var memoryStream = new MemoryStream())
@@ -123,97 +134,166 @@ namespace Internal
                 }
             }
         }
-    }
 
-    [Preserve]
-    public static class EncryptionKeyManagement
-    {
-        private const string KeyPref = "EncryptedEncryptionKey";
-        private const string IvPref = "EncryptedEncryptionIV";
-
-        private static readonly byte[] MasterKey = Encoding.UTF8.GetBytes("MasterSecretKey1234567890123456");
-
-        public static (byte[] Key, byte[] IV) GetOrCreateKeyAndIV()
+        /// <summary>
+        /// Генерирует и сохраняет новый зашифрованный ключ и IV.
+        /// Также создает фейковые ключи для дополнительной защиты.
+        /// </summary>
+        private void GenerateAndSaveKey()
         {
-            if (!PlayerPrefs.HasKey(KeyPref) || !PlayerPrefs.HasKey(IvPref))
+            using (var aes = Aes.Create())
             {
-                var key = GenerateRandomKey(32);
-                var iv = GenerateRandomKey(16);
-
-                var encryptedKey = EncryptWithMasterKey(key, MasterKey);
-                var encryptedIv = EncryptWithMasterKey(iv, MasterKey);
-
-                PlayerPrefs.SetString(KeyPref, Convert.ToBase64String(encryptedKey));
-                PlayerPrefs.SetString(IvPref, Convert.ToBase64String(encryptedIv));
-                PlayerPrefs.Save();
-
-                Debug.Log("[EncryptionKeyManagement] First time setup. Generated new key and IV.");
-                Debug.Log($"[EncryptionKeyManagement] Generated Key: {BitConverter.ToString(key)}");
-                Debug.Log($"[EncryptionKeyManagement] Generated IV: {BitConverter.ToString(iv)}");
+                aes.GenerateKey();
+                aes.GenerateIV();
+                Key = aes.Key;
+                IV = aes.IV;
             }
 
-            var encryptedSavedKey = Convert.FromBase64String(PlayerPrefs.GetString(KeyPref));
-            var encryptedSavedIv = Convert.FromBase64String(PlayerPrefs.GetString(IvPref));
+            // Переворачиваем ключ для дополнительной защиты //
+            Key = ReverseByteArray(Key);
 
-            var key_ = DecryptWithMasterKey(encryptedSavedKey, MasterKey);
-            var iv_ = DecryptWithMasterKey(encryptedSavedIv, MasterKey);
+            // Преобразуем настоящий ключ в несколько фейковых //
+            var fakeKeys = GenerateFakeKeys();
+            var encryptedFakeKeys = EncryptFakeKeys(fakeKeys);
 
-            Debug.Log($"[EncryptionKeyManagement] Loaded Key: {BitConverter.ToString(key_)}");
-            Debug.Log($"[EncryptionKeyManagement] Loaded IV: {BitConverter.ToString(iv_)}");
+            // Шифруем настоящий ключ с использованием мастер-ключа //
+            var encryptedKey = EncryptWithMasterKey(Key);
+            var encryptedIV = EncryptWithMasterKey(IV);
 
-            return (key_, iv_);
+            // Сохраняем зашифрованные ключи и фейковые в PlayerPrefs //
+            PlayerPrefs.SetString(EncryptionConstants.EncryptedKeyPref, Convert.ToBase64String(encryptedKey));
+            PlayerPrefs.SetString(EncryptionConstants.EncryptedIVPref, Convert.ToBase64String(encryptedIV));
+        
+            // Фейковые ключи //
+            PlayerPrefs.SetString(EncryptionConstants.FakeKeysPref, string.Join(",", encryptedFakeKeys));
+            PlayerPrefs.Save();
         }
 
-        private static byte[] EncryptWithMasterKey(byte[] data, byte[] masterKey)
+        /// <summary>
+        /// Загружает зашифрованный ключ и IV из PlayerPrefs.
+        /// </summary>
+        private void LoadKey()
         {
-            using (Aes aes = Aes.Create())
+            var encryptedKey = Convert.FromBase64String(PlayerPrefs.GetString(EncryptionConstants.EncryptedKeyPref));
+            var encryptedIV = Convert.FromBase64String(PlayerPrefs.GetString(EncryptionConstants.EncryptedIVPref));
+            var fakeKeys = PlayerPrefs.GetString(EncryptionConstants.FakeKeysPref).Split(',');
+
+            // Расшифровываем ключ и IV //
+            Key = DecryptWithMasterKey(encryptedKey);
+            IV = DecryptWithMasterKey(encryptedIV);
+
+            // Дополнительно можно распечатать фейковые ключи для анализа //
+            Debug.Log($"Fake Keys: {string.Join(", ", fakeKeys)}");
+        }
+
+        /// <summary>
+        /// Шифрует данные с использованием мастер-ключа.
+        /// </summary>
+        /// <param name="data">Данные для шифрования.</param>
+        /// <returns>Зашифрованные данные.</returns>
+        private byte[] EncryptWithMasterKey(byte[] data)
+        {
+            using (var aes = Aes.Create())
             {
-                aes.Key = masterKey;
-                aes.IV = masterKey.Take(16).ToArray();
+                aes.Key = Encoding.UTF8.GetBytes(EncryptionConstants.MasterKey);
+                
+                // Используем первые 16 байтов мастер-ключа как IV //
+                aes.IV = aes.Key.Take(EncryptionConstants.IVLength).ToArray();
 
                 using (var encryptor = aes.CreateEncryptor(aes.Key, aes.IV))
-                {
                     return PerformCryptography(data, encryptor);
-                }
             }
         }
 
-        private static byte[] DecryptWithMasterKey(byte[] encryptedData, byte[] masterKey)
+        /// <summary>
+        /// Дешифрует данные с использованием мастер-ключа.
+        /// </summary>
+        /// <param name="encryptedData">Зашифрованные данные.</param>
+        /// <returns>Дешифрованные данные.</returns>
+        private byte[] DecryptWithMasterKey(byte[] encryptedData)
         {
-            using (Aes aes = Aes.Create())
+            using (var aes = Aes.Create())
             {
-                aes.Key = masterKey;
-                aes.IV = masterKey.Take(16).ToArray();
+                aes.Key = Encoding.UTF8.GetBytes(EncryptionConstants.MasterKey);
+                
+                // Используем первые 16 байтов мастер-ключа как IV //
+                aes.IV = aes.Key.Take(EncryptionConstants.IVLength).ToArray();
 
                 using (var decryptor = aes.CreateDecryptor(aes.Key, aes.IV))
-                {
                     return PerformCryptography(encryptedData, decryptor);
-                }
             }
         }
 
-        private static byte[] PerformCryptography(byte[] data, ICryptoTransform cryptoTransform)
+        /// <summary>
+        /// Генерирует список фейковых ключей для усложнения поиска настоящего ключа.
+        /// </summary>
+        /// <returns>Список фейковых ключей.</returns>
+        private List<string> GenerateFakeKeys()
         {
-            using (var memoryStream = new MemoryStream())
-            {
-                using (var cryptoStream = new CryptoStream(memoryStream, cryptoTransform, CryptoStreamMode.Write))
-                {
-                    cryptoStream.Write(data, 0, data.Length);
-                    cryptoStream.FlushFinalBlock();
+            var fakeKeys = new List<string>();
+            
+            // Базовый ключ для создания фейков //
+            // Главное на релизе в конфиге не забыть поменять:D
+            var baseKey = EncryptionConstants.BaseKey;
 
-                    return memoryStream.ToArray();
-                }
+            //////////////////////////////////////////////////////////////////
+            // Генерация фейковых ключей через XOR или другие трансформации //
+            //////////////////////////////////////////////////////////////////
+            for (var i = 0; i < 5; i++)
+            {
+                var fakeKey = XORTransform(baseKey, i);
+                
+                fakeKeys.Add(fakeKey);
             }
+
+            return fakeKeys;
         }
 
-        private static byte[] GenerateRandomKey(int length)
+        /// <summary>
+        /// Преобразует ключ с использованием операции XOR.
+        /// </summary>
+        /// <param name="baseKey">Базовый ключ.</param>
+        /// <param name="index">Индекс для изменения ключа.</param>
+        /// <returns>Измененный ключ.</returns>
+        private string XORTransform(string baseKey, int index)
         {
-            using (var rng = new RNGCryptoServiceProvider())
+            var transformed = new char[baseKey.Length];
+           
+            for (var i = 0; i < baseKey.Length; i++)
+                transformed[i] = (char)(baseKey[i] ^ (index + 1));
+
+            return new string(transformed);
+        }
+
+        /// <summary>
+        /// Шифрует фейковые ключи с использованием мастер-ключа.
+        /// </summary>
+        /// <param name="fakeKeys">Список фейковых ключей.</param>
+        /// <returns>Зашифрованные фейковые ключи.</returns>
+        private List<string> EncryptFakeKeys(List<string> fakeKeys)
+        {
+            var encryptedKeys = new List<string>();
+
+            foreach (var fakeKey in fakeKeys)
             {
-                var key = new byte[length];
-                rng.GetBytes(key);
-                return key;
+                var encryptedFakeKey = EncryptWithMasterKey(Encoding.UTF8.GetBytes(fakeKey));
+                
+                encryptedKeys.Add(Convert.ToBase64String(encryptedFakeKey));
             }
+
+            return encryptedKeys;
+        }
+
+        /// <summary>
+        /// Переворачивает массив байтов.
+        /// </summary>
+        /// <param name="data">Массив байтов для переворота.</param>
+        /// <returns>Перевернутый массив байтов.</returns>
+        private byte[] ReverseByteArray(byte[] data)
+        {
+            Array.Reverse(data);
+            
+            return data;
         }
     }
 }
