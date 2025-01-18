@@ -1,7 +1,4 @@
 using System;
-using System.IO;
-using UnityEngine;
-using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -21,6 +18,7 @@ namespace Internal
 
         /// <summary>
         /// Преобразует имя файла с использованием алгоритма SHA256.
+        /// *NOTE: Обратно конвертнуть уже не выйдет!!!
         /// </summary>
         /// <param name="fileName">Имя файла для шифрования.</param>
         /// <returns>Зашифрованное имя файла.</returns>
@@ -35,17 +33,6 @@ namespace Internal
                 // Возвращаем как строку без дефисов //
                 return BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
             }
-        }
-
-        /// <summary>
-        /// Дешифрует имя файла для UI.
-        /// </summary>
-        /// <param name="encryptedFileName">Зашифрованное имя файла.</param>
-        /// <returns>Дешифрованное имя файла для UI.</returns>
-        public static string GetDecryptedFileNameForUI(string encryptedFileName)
-        {
-            // Дешифровка с возвратом оригинального имени для отображения в UI
-            return DecryptFileName(encryptedFileName);
         }
     }
 }
