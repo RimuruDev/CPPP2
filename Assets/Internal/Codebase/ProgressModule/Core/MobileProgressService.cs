@@ -54,7 +54,8 @@ namespace Internal
             IDataStorage dataStorage,
             IEncryptionService encryptionService,
             IProgressValidator validator,
-            IProgressMigrationService migrationService)
+            IProgressMigrationService migrationService,
+            FakeKeyGenerator fakeKeyGenerator)
         {
             this.fileFormatConfig = fileFormatConfig;
             this.dataStorage = dataStorage;
@@ -65,7 +66,11 @@ namespace Internal
             directoryPath = Path.Combine(Application.persistentDataPath, Constants.ROOT_FOLDER_NAME);
 
             if (IsFirstLaunch())
+            {
                 Directory.CreateDirectory(directoryPath);
+
+                fakeKeyGenerator.StartDelayedFakeKeyGeneration();
+            }
 
             const string userProgressFile = Constants.USER_PROGRESS_FILE;
             const string audioSettingsFile = Constants.AUDIO_SETTINGS_FILE;
@@ -83,7 +88,8 @@ namespace Internal
                             UserProgress?.Dispose();
                         }
 
-                        UserProgress = new UserProgressProxy(LoadAllProgress(userProgressFile, DefaultProgressFactory.CreateDefaultProgress));
+                        UserProgress = new UserProgressProxy(LoadAllProgress(userProgressFile,
+                            DefaultProgressFactory.CreateDefaultProgress));
                     }
                 },
                 {
@@ -95,7 +101,8 @@ namespace Internal
                             AudioSettings?.Dispose();
                         }
 
-                        AudioSettings = new AudioSettingsProxy(LoadAllProgress(audioSettingsFile, DefaultProgressFactory.CreateDefaultAudioSettings));
+                        AudioSettings = new AudioSettingsProxy(LoadAllProgress(audioSettingsFile,
+                            DefaultProgressFactory.CreateDefaultAudioSettings));
                     }
                 },
                 {
@@ -107,7 +114,8 @@ namespace Internal
                             WorldProgress?.Dispose();
                         }
 
-                        WorldProgress = new WorldProgressProxy(LoadAllProgress(worldProgressFile, DefaultProgressFactory.CreateDefaultWorldProgress));
+                        WorldProgress = new WorldProgressProxy(LoadAllProgress(worldProgressFile,
+                            DefaultProgressFactory.CreateDefaultWorldProgress));
                     }
                 }
             };
@@ -241,7 +249,8 @@ namespace Internal
                 return;
             }
 
-            var savePath = Path.Combine(directoryPath, fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
+            var savePath = Path.Combine(directoryPath,
+                fileName + fileFormatConfig.CurrentFormatHandler.GetFileExtension());
             var rawData = fileFormatConfig.CurrentFormatHandler.Serialize(data);
             var encryptedData = encryptionService.Encrypt(rawData);
 
@@ -342,13 +351,15 @@ namespace Internal
                 }
                 catch (Exception e)
                 {
-                    Debug.LogWarning($"[Catch Validation Layer] Failed to load progress: {e.Message}. Initializing default data.");
+                    Debug.LogWarning(
+                        $"[Catch Validation Layer] Failed to load progress: {e.Message}. Initializing default data.");
                     return createDefault();
                 }
             }
             catch (InvalidDataException invalidDataException)
             {
-                Debug.LogWarning($"[Decrypt -> [Pre Validation Layer]] -> Failed to load progress: {invalidDataException.Message}");
+                Debug.LogWarning(
+                    $"[Decrypt -> [Pre Validation Layer]] -> Failed to load progress: {invalidDataException.Message}");
                 return createDefault();
             }
         }
@@ -390,12 +401,8 @@ namespace Internal
         /// true - Это первый запуск игры
         /// false - Игрок как минимум 1 раз сохранялся.
         /// </returns>
-        private bool IsFirstLaunch()
+        public bool IsFirstLaunch()
         {
-            //
-            // Проверяем наличие папки Database. Мне ульттра важно что бы запуск игры был быстрый.
-            // По этому по этому признаку буду проверять, первый запуск иры или нет.
-            //
             if (!Directory.Exists(directoryPath))
             {
                 Debug.Log($"<color=yellow>[FirstLaunch] Directory doesn't exist. Creating it.]</color>");
@@ -403,17 +410,26 @@ namespace Internal
             }
 
             //
-            // Проверяем, есть ли файлы в папке.
-            // На случай если CleanMaster или пользователь удалил файлы сейва или же по ошибке какой нибудь.
-            // Так же это пригодиться для того что бы можно было папки создать, а потом уже все остальное :3
+            // Вообще по одному файлу достаточно, так как если нет основного, можно все офнуть, ибо нефиг лезть в файлы :3
             //
-            var files = Directory.GetFiles(directoryPath);
+            var requiredFiles = new[]
+            {
+                Path.Combine(directoryPath, Constants.USER_PROGRESS_FILE),
+                Path.Combine(directoryPath, Constants.AUDIO_SETTINGS_FILE),
+            };
 
-            var existFiles = files.Length == 0;
+            // Проверяем, все ли необходимые файлы существуют //
+            foreach (var file in requiredFiles)
+            {
+                if (!File.Exists(file))
+                {
+                    Debug.Log($"<color=yellow>[FirstLaunch] Missing required file: {file}.</color>");
+                    return true;
+                }
+            }
 
-            Debug.Log($"<color=yellow>[FirstLaunch] Found {files.Length} file(s) in directory.</color>");
-
-            return existFiles;
+            Debug.Log("<color=yellow>[FirstLaunch] All required files found, not the first launch.</color>");
+            return false;
         }
 
         #endregion

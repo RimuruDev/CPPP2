@@ -1308,6 +1308,7 @@ GameObject:
   m_Component:
   - component: {fileID: 675662802}
   - component: {fileID: 675662801}
+  - component: {fileID: 675662803}
   m_Layer: 0
   m_Name: PMExample
   m_TagString: Untagged
@@ -1337,6 +1338,7 @@ MonoBehaviour:
   saveButton: {fileID: 164312090}
   loadButton: {fileID: 424833827}
   deleteButton: {fileID: 1558519795}
+  fakeKeyGenerator: {fileID: 675662803}
 --- !u!4 &675662802
 Transform:
   m_ObjectHideFlags: 0
@@ -1352,6 +1354,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &675662803
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 675662800}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c1f501536524b6681d70b489cae75be, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &713899375
 GameObject:
   m_ObjectHideFlags: 0

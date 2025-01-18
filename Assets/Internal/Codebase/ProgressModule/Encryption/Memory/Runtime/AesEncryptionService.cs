@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Security.Cryptography;
@@ -200,6 +201,66 @@ namespace Internal
         {
             var decryptedData = DecryptData(encryptedData);
             return DeserializeObject(decryptedData);
+        }
+
+        #endregion
+
+        #region Метод шифрования с мастер-ключом
+
+        // Ваш мастер-ключ для шифрования данных //
+        private static readonly string masterKey = "MasterSecretKeyForEncryption";
+
+        /// <summary>
+        /// Шифрует данные с использованием мастер-ключа.
+        /// </summary>
+        /// <param name="data">Данные для шифрования.</param>
+        /// <returns>Зашифрованные данные.</returns>
+        public static byte[] EncryptWithMasterKey(byte[] data)
+        {
+            using (var aes = Aes.Create())
+            {
+                aes.Key = new byte[32];
+                // Мастер-ключ должен быть длиной 32 байта (256 бит) //
+                var keyBytes = Encoding.UTF8.GetBytes(masterKey);
+
+                // Обрезаем мастер-ключ до нужной длины
+                Array.Copy(keyBytes, aes.Key, Math.Min(keyBytes.Length, aes.Key.Length));
+
+                // Используем первые 16 байтов мастер-ключа как IV //
+                // Длина IV = 16 байт (128 бит) //
+                aes.IV = aes.Key.Take(16).ToArray();
+
+                using (var encryptor = aes.CreateEncryptor(aes.Key, aes.IV))
+                {
+                    return PerformCryptography(data, encryptor);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Дешифрует данные с использованием мастер-ключа.
+        /// </summary>
+        /// <param name="encryptedData">Зашифрованные данные.</param>
+        /// <returns>Дешифрованные данные.</returns>
+        public static byte[] DecryptWithMasterKey(byte[] encryptedData)
+        {
+            using (var aes = Aes.Create())
+            {
+                aes.Key = new byte[32];
+                // Мастер-ключ должен быть длиной 32 байта (256 бит) //
+                var keyBytes = Encoding.UTF8.GetBytes(masterKey);
+
+                // Обрезаем мастер-ключ до нужной длины //
+                Array.Copy(keyBytes, aes.Key, Math.Min(keyBytes.Length, aes.Key.Length));
+
+                // Используем первые 16 байтов мастер-ключа как IV //
+                aes.IV = aes.Key.Take(16).ToArray();
+
+                using (var decryptor = aes.CreateDecryptor(aes.Key, aes.IV))
+                {
+                    return PerformCryptography(encryptedData, decryptor);
+                }
+            }
         }
 
         #endregion
