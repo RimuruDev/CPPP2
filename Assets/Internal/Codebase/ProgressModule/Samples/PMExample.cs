@@ -32,6 +32,9 @@ namespace Internal
         [SerializeField] private Button loadButton;
         [SerializeField] private Button deleteButton;
 
+        [SerializeField]
+        private FakeKeyGenerator fakeKeyGenerator;
+        
         private IProgressService progressService;
         private void Awake()
         {
@@ -55,7 +58,8 @@ namespace Internal
                 dataStorage,
                 encryptionService,
                 validator,
-                migrationService
+                migrationService,
+                fakeKeyGenerator
             );
 
             // progressService.LoadProgressById(Constants.AUDIO_SETTINGS_FILE);
