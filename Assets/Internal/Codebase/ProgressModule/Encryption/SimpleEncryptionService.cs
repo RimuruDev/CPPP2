@@ -195,15 +195,23 @@ namespace Internal
         {
             using (var aes = Aes.Create())
             {
-                aes.Key = Encoding.UTF8.GetBytes(EncryptionConstants.MasterKey);
-                
-                // Используем первые 16 байтов мастер-ключа как IV //
+                // Убедись, что длина ключа соответствует допустимым размерам:
+                // 32 -> 256 бит | Это исправление ошибки:
+                //  - Error: CryptographicException: Specified key is not a valid size for this algorithm.
+                aes.Key = new byte[32]; 
+                var keyBytes = Encoding.UTF8.GetBytes(EncryptionConstants.MasterKey);
+              
+                // Обрезаем если нужно ===
+                Array.Copy(keyBytes, aes.Key, Math.Min(keyBytes.Length, aes.Key.Length));
+
+                // Используем первые 16 байтов как IV //
                 aes.IV = aes.Key.Take(EncryptionConstants.IVLength).ToArray();
 
                 using (var encryptor = aes.CreateEncryptor(aes.Key, aes.IV))
                     return PerformCryptography(data, encryptor);
             }
         }
+
 
         /// <summary>
         /// Дешифрует данные с использованием мастер-ключа.
@@ -214,8 +222,17 @@ namespace Internal
         {
             using (var aes = Aes.Create())
             {
-                aes.Key = Encoding.UTF8.GetBytes(EncryptionConstants.MasterKey);
+                // Загружаем и проверяем размер ключа //
+                var keyBytes = Encoding.UTF8.GetBytes(EncryptionConstants.MasterKey);
+              
+                // Убедись, что длина ключа соответствует допустимым размерам:
+                // 32 -> 256 бит | Это исправление ошибки:
+                //  - Error: CryptographicException: Specified key is not a valid size for this algorithm.
+                aes.Key = new byte[32];
                 
+                // Обрезаем! ===
+                Array.Copy(keyBytes, aes.Key, Math.Min(keyBytes.Length, aes.Key.Length)); 
+
                 // Используем первые 16 байтов мастер-ключа как IV //
                 aes.IV = aes.Key.Take(EncryptionConstants.IVLength).ToArray();
 
@@ -223,6 +240,7 @@ namespace Internal
                     return PerformCryptography(encryptedData, decryptor);
             }
         }
+
 
         /// <summary>
         /// Генерирует список фейковых ключей для усложнения поиска настоящего ключа.
