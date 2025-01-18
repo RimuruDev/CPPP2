@@ -7,7 +7,12 @@ namespace Internal
     public class FakeKeyGenerator : MonoBehaviour
     {
         private const int fakeKeyCount = 10;
+
+#if !UNITY_EDITOR
         private const float GenerationCooldown = 2f;
+#else
+        private const float GenerationCooldown = 0f;
+#endif
 
         public void StartDelayedFakeKeyGeneration()
         {
