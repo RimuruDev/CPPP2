@@ -6,6 +6,9 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 
+// TODO: Хранить копию ключа в Database, на случай если ключ затрут, изменят, подменят. При попытке модификации или порчи основного ключа, резервный будет его восстанавливать. При этом, нужно исключить взлом через абьюз бекап ключа. 
+// Но в игре добавить кнопку для чистки/сброса прогресса
+
 namespace Internal
 {
     /// <summary>
@@ -106,7 +109,7 @@ namespace Internal
             try
             {
                 var decoded = Convert.FromBase64String(data);
-              
+
                 return decoded.Length >= EncryptionConstants.MinEncryptedDataLength;
             }
             catch (FormatException)
@@ -163,7 +166,7 @@ namespace Internal
             // Сохраняем зашифрованные ключи и фейковые в PlayerPrefs //
             PlayerPrefs.SetString(EncryptionConstants.EncryptedKeyPref, Convert.ToBase64String(encryptedKey));
             PlayerPrefs.SetString(EncryptionConstants.EncryptedIVPref, Convert.ToBase64String(encryptedIV));
-        
+
             // Фейковые ключи //
             PlayerPrefs.SetString(EncryptionConstants.FakeKeysPref, string.Join(",", encryptedFakeKeys));
             PlayerPrefs.Save();
@@ -174,17 +177,44 @@ namespace Internal
         /// </summary>
         private void LoadKey()
         {
-            var encryptedKey = Convert.FromBase64String(PlayerPrefs.GetString(EncryptionConstants.EncryptedKeyPref));
-            var encryptedIV = Convert.FromBase64String(PlayerPrefs.GetString(EncryptionConstants.EncryptedIVPref));
-            var fakeKeys = PlayerPrefs.GetString(EncryptionConstants.FakeKeysPref).Split(',');
+            try
+            {
+                // Загружаем зашифрованные данные из PlayerPrefs //
+                var encryptedKey = Convert.FromBase64String(PlayerPrefs.GetString(EncryptionConstants.EncryptedKeyPref));
+                var encryptedIV = Convert.FromBase64String(PlayerPrefs.GetString(EncryptionConstants.EncryptedIVPref));
+                
+                // Дешифруем ключ и IV //
+                Key = DecryptWithMasterKey(encryptedKey);
+                IV = DecryptWithMasterKey(encryptedIV);
 
-            // Расшифровываем ключ и IV //
-            Key = DecryptWithMasterKey(encryptedKey);
-            IV = DecryptWithMasterKey(encryptedIV);
+                // Проверяем, что расшифрованные данные имеют правильный размер //
+                if (Key.Length != 32 || IV.Length != 16)
+                {
+                    Debug.LogError($"Loaded key or IV has invalid size. Key length: {Key.Length} | IV length: {IV.Length}");
+                    throw new CryptographicException("Invalid key or IV size.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"Failed to load key or IV: {ex.Message}. Generating new key.");
+        
+                // Генерация нового ключа //
+                GenerateAndSaveKey();
+            }
 
-            // Дополнительно можно распечатать фейковые ключи для анализа //
-            Debug.Log($"Fake Keys: {string.Join(", ", fakeKeys)}");
+            try
+            {
+                var fakeKeys = PlayerPrefs.GetString(EncryptionConstants.FakeKeysPref).Split(',');
+                
+                Debug.Log($"Fake Keys: {string.Join(", ", fakeKeys)}");
+
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"Failed to load key or IV (FOR FAKE KEYS ;3): {e.Message}");
+            }
         }
+
 
         /// <summary>
         /// Шифрует данные с использованием мастер-ключа.
@@ -198,9 +228,9 @@ namespace Internal
                 // Убедись, что длина ключа соответствует допустимым размерам:
                 // 32 -> 256 бит | Это исправление ошибки:
                 //  - Error: CryptographicException: Specified key is not a valid size for this algorithm.
-                aes.Key = new byte[32]; 
+                aes.Key = new byte[32];
                 var keyBytes = Encoding.UTF8.GetBytes(EncryptionConstants.MasterKey);
-              
+
                 // Обрезаем если нужно ===
                 Array.Copy(keyBytes, aes.Key, Math.Min(keyBytes.Length, aes.Key.Length));
 
@@ -224,14 +254,14 @@ namespace Internal
             {
                 // Загружаем и проверяем размер ключа //
                 var keyBytes = Encoding.UTF8.GetBytes(EncryptionConstants.MasterKey);
-              
+
                 // Убедись, что длина ключа соответствует допустимым размерам:
                 // 32 -> 256 бит | Это исправление ошибки:
                 //  - Error: CryptographicException: Specified key is not a valid size for this algorithm.
                 aes.Key = new byte[32];
-                
+
                 // Обрезаем! ===
-                Array.Copy(keyBytes, aes.Key, Math.Min(keyBytes.Length, aes.Key.Length)); 
+                Array.Copy(keyBytes, aes.Key, Math.Min(keyBytes.Length, aes.Key.Length));
 
                 // Используем первые 16 байтов мастер-ключа как IV //
                 aes.IV = aes.Key.Take(EncryptionConstants.IVLength).ToArray();
@@ -249,7 +279,7 @@ namespace Internal
         private List<string> GenerateFakeKeys()
         {
             var fakeKeys = new List<string>();
-            
+
             // Базовый ключ для создания фейков //
             // Главное на релизе в конфиге не забыть поменять:D
             var baseKey = EncryptionConstants.BaseKey;
@@ -260,7 +290,7 @@ namespace Internal
             for (var i = 0; i < 5; i++)
             {
                 var fakeKey = XORTransform(baseKey, i);
-                
+
                 fakeKeys.Add(fakeKey);
             }
 
@@ -276,7 +306,7 @@ namespace Internal
         private string XORTransform(string baseKey, int index)
         {
             var transformed = new char[baseKey.Length];
-           
+
             for (var i = 0; i < baseKey.Length; i++)
                 transformed[i] = (char)(baseKey[i] ^ (index + 1));
 
@@ -295,7 +325,7 @@ namespace Internal
             foreach (var fakeKey in fakeKeys)
             {
                 var encryptedFakeKey = EncryptWithMasterKey(Encoding.UTF8.GetBytes(fakeKey));
-                
+
                 encryptedKeys.Add(Convert.ToBase64String(encryptedFakeKey));
             }
 
@@ -310,7 +340,7 @@ namespace Internal
         private byte[] ReverseByteArray(byte[] data)
         {
             Array.Reverse(data);
-            
+
             return data;
         }
     }
