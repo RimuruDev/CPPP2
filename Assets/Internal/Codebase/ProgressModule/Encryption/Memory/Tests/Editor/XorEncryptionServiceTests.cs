@@ -1,5 +1,8 @@
 using NUnit.Framework;
 using System.Collections.Generic;
+using System.IO;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Formatters.Binary;
 
 namespace Internal.Tests
 {
@@ -26,7 +29,7 @@ namespace Internal.Tests
             var decryptedValue = XorEncryptionService.DecryptFloatWithXor(encryptedValue);
 
             // Погрешность для float ===
-            Assert.AreEqual(originalValue, decryptedValue, 0.0001f); 
+            Assert.AreEqual(originalValue, decryptedValue, 0.0001f);
         }
 
         [Test]

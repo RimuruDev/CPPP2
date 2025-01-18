@@ -1,5 +1,5 @@
-using NUnit.Framework;
 using System;
+using NUnit.Framework;
 
 namespace Internal.Tests
 {
@@ -7,11 +7,25 @@ namespace Internal.Tests
     public class XorEncryptionObjectServiceTests
     {
         [Serializable]
-        public class MyClass
+        public class Address
+        {
+            public string Street;
+            public string City;
+        }
+
+        [Serializable]
+        public class Person
         {
             public int Id;
             public string Name;
-            public float Value;
+            public Address Address;
+        }
+
+        [Serializable]
+        public struct Point
+        {
+            public int X;
+            public int Y;
         }
 
         #region Примитивы
@@ -19,8 +33,18 @@ namespace Internal.Tests
         [Test]
         public void SerializeObject_ShouldReturnCorrectByteArray()
         {
-            var originalObject = new MyClass { Id = 1, Name = "Test", Value = 123.45f };
-            var serializedObject = XorEncryptionObjectService.SerializeObject(originalObject);
+            var originalObject = new Person
+            {
+                Id = 1,
+                Name = "John",
+                Address = new Address
+                {
+                    Street = "Main St",
+                    City = "Metropolis"
+                }
+            };
+
+            var serializedObject = XorEncryptionService.SerializeObject(originalObject);
 
             Assert.IsNotNull(serializedObject);
             Assert.AreNotEqual(0, serializedObject.Length);
@@ -29,78 +53,124 @@ namespace Internal.Tests
         [Test]
         public void DeserializeObject_ShouldReturnCorrectObject()
         {
-            var originalObject = new MyClass { Id = 1, Name = "Test", Value = 123.45f };
-            var serializedObject = XorEncryptionObjectService.SerializeObject(originalObject);
+            var originalObject = new Person
+            {
+                Id = 1,
+                Name = "John",
+                Address = new Address
+                {
+                    Street = "Main St",
+                    City = "Metropolis"
+                }
+            };
 
-            var deserializedObject = (MyClass)XorEncryptionObjectService.DeserializeObject(serializedObject);
+            var serializedObject = XorEncryptionService.SerializeObject(originalObject);
+            var deserializedObject = (Person)XorEncryptionService.DeserializeObject(serializedObject);
 
             Assert.AreEqual(originalObject.Id, deserializedObject.Id);
             Assert.AreEqual(originalObject.Name, deserializedObject.Name);
-            Assert.AreEqual(originalObject.Value, deserializedObject.Value);
+            Assert.AreEqual(originalObject.Address.Street, deserializedObject.Address.Street);
+            Assert.AreEqual(originalObject.Address.City, deserializedObject.Address.City);
         }
-
-        #endregion
-
-        #region Шифрование и дешифрование объектов с использованием XOR
 
         [Test]
         public void EncryptDecryptObject_WithXor_ShouldReturnOriginalObject()
         {
-            var originalObject = new MyClass { Id = 1, Name = "Test", Value = 123.45f };
+            var originalObject = new Person
+            {
+                Id = 1,
+                Name = "John",
+                Address = new Address
+                {
+                    Street = "Main St",
+                    City = "Metropolis"
+                }
+            };
 
-            // Шифруем объект //
-            var encryptedObject = XorEncryptionObjectService.EncryptObjectWithXor(originalObject);
+            var encryptedObject = XorEncryptionService.EncryptObjectWithXor(originalObject);
+            var decryptedObject = (Person)XorEncryptionService.DecryptObjectWithXor(encryptedObject);
 
-            // Дешифруем объект //
-            var decryptedObject = (MyClass)XorEncryptionObjectService.DecryptObjectWithXor(encryptedObject);
-
-            // Проверяем, что оригинальный объект и дешифрованный совпадают //
             Assert.AreEqual(originalObject.Id, decryptedObject.Id);
             Assert.AreEqual(originalObject.Name, decryptedObject.Name);
-            Assert.AreEqual(originalObject.Value, decryptedObject.Value);
+            Assert.AreEqual(originalObject.Address.Street, decryptedObject.Address.Street);
+            Assert.AreEqual(originalObject.Address.City, decryptedObject.Address.City);
         }
 
         #endregion
 
-        #region Шифрование и дешифрование байтовых данных с использованием XOR
+        #region Структуры
 
         [Test]
-        public void EncryptDecryptByteArray_WithXor_ShouldReturnOriginalArray()
+        public void SerializeAndDeserializeStruct_ShouldWorkCorrectly()
         {
-            var originalData = new byte[] { 1, 2, 3, 4, 5 };
+            var originalStruct = new Point { X = 10, Y = 20 };
+            var serializedStruct = XorEncryptionService.SerializeObject(originalStruct);
+            var deserializedStruct = (Point)XorEncryptionService.DeserializeObject(serializedStruct);
 
-            // Шифруем данные
-            var encryptedData = XorEncryptionObjectService.EncryptWithXor(originalData);
+            Assert.AreEqual(originalStruct.X, deserializedStruct.X);
+            Assert.AreEqual(originalStruct.Y, deserializedStruct.Y);
+        }
 
-            // Дешифруем данные
-            var decryptedData = XorEncryptionObjectService.DecryptWithXor(encryptedData);
+        [Test]
+        public void EncryptDecryptStruct_WithXor_ShouldReturnOriginalStruct()
+        {
+            var originalStruct = new Point { X = 10, Y = 20 };
 
-            // Проверяем, что оригинальные данные и дешифрованные совпадают //
-            Assert.AreEqual(originalData.Length, decryptedData.Length);
+            var encryptedStruct = XorEncryptionService.EncryptObjectWithXor(originalStruct);
+            var decryptedStruct = (Point)XorEncryptionService.DecryptObjectWithXor(encryptedStruct);
 
-            for (var i = 0; i < originalData.Length; i++)
+            Assert.AreEqual(originalStruct.X, decryptedStruct.X);
+            Assert.AreEqual(originalStruct.Y, decryptedStruct.Y);
+        }
+
+        #endregion
+
+        #region Вложенные объекты
+
+        [Test]
+        public void SerializeAndDeserializeNestedObject_ShouldWorkCorrectly()
+        {
+            var originalObject = new Person
             {
-                Assert.AreEqual(originalData[i], decryptedData[i]);
-            }
+                Id = 1,
+                Name = "John",
+                Address = new Address
+                {
+                    Street = "Main St",
+                    City = "Metropolis"
+                }
+            };
+
+            var serializedObject = XorEncryptionService.SerializeObject(originalObject);
+            var deserializedObject = (Person)XorEncryptionService.DeserializeObject(serializedObject);
+
+            Assert.AreEqual(originalObject.Id, deserializedObject.Id);
+            Assert.AreEqual(originalObject.Name, deserializedObject.Name);
+            Assert.AreEqual(originalObject.Address.Street, deserializedObject.Address.Street);
+            Assert.AreEqual(originalObject.Address.City, deserializedObject.Address.City);
         }
-
-        #endregion
-
-        #region Тесты симметричности XOR
-
+        
         [Test]
-        public void EncryptDecryptString_WithXor_ShouldReturnOriginalString()
+        public void SerializeAndDeserializeNestedObject_ShouldWorkCorrectly_GenericType()
         {
-            var originalValue = "Test String";
+            var originalObject = new Person
+            {
+                Id = 1,
+                Name = "John",
+                Address = new Address
+                {
+                    Street = "Main St",
+                    City = "Metropolis"
+                }
+            };
 
-            // Шифруем строку
-            var encryptedValue = XorEncryptionService.EncryptWithXor(originalValue);
+            var serializedObject = XorEncryptionService.SerializeObject(originalObject);
+            var deserializedObject = XorEncryptionService.DeserializeObject<Person>(serializedObject);
 
-            // Дешифруем строку
-            var decryptedValue = XorEncryptionService.DecryptWithXor(encryptedValue);
-
-            // Проверяем, что исходная и расшифрованная строки совпадают
-            Assert.AreEqual(originalValue, decryptedValue);
+            Assert.AreEqual(originalObject.Id, deserializedObject.Id);
+            Assert.AreEqual(originalObject.Name, deserializedObject.Name);
+            Assert.AreEqual(originalObject.Address.Street, deserializedObject.Address.Street);
+            Assert.AreEqual(originalObject.Address.City, deserializedObject.Address.City);
         }
 
         #endregion

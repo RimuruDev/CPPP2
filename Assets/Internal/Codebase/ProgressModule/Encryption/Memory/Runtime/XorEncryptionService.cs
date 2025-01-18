@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Runtime.Serialization;
+using System.Runtime.Serialization.Formatters.Binary;
 
 namespace Internal
 {
@@ -7,7 +10,7 @@ namespace Internal
     {
         public static byte[] EncryptInt(int value) =>
             XorEncryptionService.EncryptIntWithXor(value);
-            
+
         public static int DecryptInt(byte[] encryptedValue) =>
             XorEncryptionService.DecryptIntWithXor(encryptedValue);
 
@@ -26,18 +29,18 @@ namespace Internal
 
         public static List<byte[]> EncryptList(List<int> list) =>
             XorEncryptionService.EncryptListWithXor(list);
-        
+
         public static List<int> DecryptList(List<byte[]> encryptedList) =>
             XorEncryptionService.DecryptListWithXor(encryptedList);
 
-        
+
         public static byte[] Encrypt(byte[] data) =>
             XorEncryptionService.EncryptWithXor(data);
 
         public static byte[] Decrypt(byte[] encryptedData) =>
             XorEncryptionService.DecryptWithXor(encryptedData);
 
-        
+
         public static string Encrypt(string value) =>
             XorEncryptionService.EncryptWithXor(value);
 
@@ -137,6 +140,76 @@ namespace Internal
         public static string DecryptWithXor(string encryptedValue)
         {
             return XOR64.Decode(encryptedValue);
+        }
+
+        #endregion
+
+        #region Object
+
+        /// <summary>
+        /// Преобразуем объект в байты
+        /// </summary>
+        /// <param name="obj"></param>
+        /// <returns></returns>
+        public static byte[] SerializeObject(object obj)
+        {
+            IFormatter formatter = new BinaryFormatter();
+
+            using (var stream = new MemoryStream())
+            {
+                formatter.Serialize(stream, obj);
+
+                return stream.ToArray();
+            }
+        }
+
+        /// <summary>
+        /// Восстановление объекта из байтового массива
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        public static object DeserializeObject(byte[] data)
+        {
+            IFormatter formatter = new BinaryFormatter();
+
+            using (var stream = new MemoryStream(data))
+            {
+                return formatter.Deserialize(stream);
+            }
+        }
+        
+        public static T DeserializeObject<T>(byte[] data)
+        {
+            IFormatter formatter = new BinaryFormatter();
+
+            using (var stream = new MemoryStream(data))
+            {
+                return (T)formatter.Deserialize(stream);
+            }
+        }
+
+        /// <summary>
+        /// Шифрования объекта (класса или структуры)
+        /// </summary>
+        /// <param name="obj"></param>
+        /// <returns></returns>
+        public static byte[] EncryptObjectWithXor(object obj)
+        {
+            var objectData = SerializeObject(obj);
+
+            return EncryptWithXor(objectData);
+        }
+
+        /// <summary>
+        /// Дешифрования объекта (класса или структуры)
+        /// </summary>
+        /// <param name="encryptedData"></param>
+        /// <returns></returns>
+        public static object DecryptObjectWithXor(byte[] encryptedData)
+        {
+            var decryptedData = DecryptWithXor(encryptedData);
+
+            return DeserializeObject(decryptedData);
         }
 
         #endregion
