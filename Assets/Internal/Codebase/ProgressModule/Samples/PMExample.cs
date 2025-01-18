@@ -33,7 +33,6 @@ namespace Internal
         [SerializeField] private Button deleteButton;
 
         private IProgressService progressService;
-
         private void Awake()
         {
             var dataStorage = new FileDataStorage();
